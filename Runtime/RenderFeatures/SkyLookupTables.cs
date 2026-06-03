@@ -4,160 +4,163 @@ using UnityEngine.Rendering;
 using Unmath;
 using static Unmath.Math;
 
-public class SkyLookupTables : FrameRenderFeature
+namespace CustomRenderPipeline
 {
-    private static readonly int _MiePhaseTextureId = Shader.PropertyToID("_MiePhaseTexture");
-
-    private readonly Sky.Settings settings;
-    private readonly Material skyMaterial;
-    private int version = -1;
-    private readonly ResourceHandle<RenderTexture> transmittance, multiScatter, groundAmbient, skyAmbient;
-
-    public SkyLookupTables(Sky.Settings settings, RenderGraph renderGraph) : base(renderGraph)
+    public class SkyLookupTables : FrameRenderFeature
     {
-        this.settings = settings;
-        skyMaterial = new Material(Shader.Find("Hidden/Physical Sky Tables")) { hideFlags = HideFlags.HideAndDontSave };
+        private static readonly int _MiePhaseTextureId = Shader.PropertyToID("_MiePhaseTexture");
 
-        transmittance = renderGraph.GetTexture(new(settings.TransmittanceWidth, settings.TransmittanceHeight), GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
-        multiScatter = renderGraph.GetTexture(new(settings.MultiScatterWidth, settings.MultiScatterHeight), GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
-        groundAmbient = renderGraph.GetTexture(new(settings.AmbientGroundWidth, 1), GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
-        skyAmbient = renderGraph.GetTexture(new(settings.AmbientSkyWidth, settings.AmbientSkyHeight), GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
-    }
+        private readonly Sky.Settings settings;
+        private readonly Material skyMaterial;
+        private int version = -1;
+        private readonly ResourceHandle<RenderTexture> transmittance, multiScatter, groundAmbient, skyAmbient;
 
-    protected override void Cleanup(bool disposing)
-    {
-        renderGraph.ReleasePersistentResource(transmittance, -1);
-        renderGraph.ReleasePersistentResource(multiScatter, -1);
-        renderGraph.ReleasePersistentResource(groundAmbient, -1);
-        renderGraph.ReleasePersistentResource(skyAmbient, -1);
-    }
-
-    public override void Render(ScriptableRenderContext context)
-    {
-        renderGraph.AddProfileBeginPass("Sky Tables");
-
-        float RayleighScattering(float wavelength)
+        public SkyLookupTables(Sky.Settings settings, RenderGraph renderGraph) : base(renderGraph)
         {
-            var airRefractiveIndex = 1.000293f;
-            var Ns = 2.504e25f;
-            return 8 * Pow(Pi, 3) * Square(Square(airRefractiveIndex) - 1) / (3 * Ns * Pow(wavelength * 1e-9f, 4));
+            this.settings = settings;
+            skyMaterial = new Material(Shader.Find("Hidden/Physical Sky Tables")) { hideFlags = HideFlags.HideAndDontSave };
+
+            transmittance = renderGraph.GetTexture(new(settings.TransmittanceWidth, settings.TransmittanceHeight), GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
+            multiScatter = renderGraph.GetTexture(new(settings.MultiScatterWidth, settings.MultiScatterHeight), GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
+            groundAmbient = renderGraph.GetTexture(new(settings.AmbientGroundWidth, 1), GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
+            skyAmbient = renderGraph.GetTexture(new(settings.AmbientSkyWidth, settings.AmbientSkyHeight), GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
         }
 
-        var rayleigh = new Float3(RayleighScattering(680), RayleighScattering(550), RayleighScattering(440));
-        rayleigh = ColorspaceUtility.Rec709ToRec2020(rayleigh);
-
-        // TODO: This doesn't work for some reason
-        //var rayleigh = new Float3(RayleighScattering(630), RayleighScattering(532), RayleighScattering(467));
-
-        var radius = settings.PlanetRadius * settings.EarthScale;
-        var height = settings.AtmosphereHeight * settings.EarthScale;
-
-        var radiusSquared = Sq(radius);
-        var sqMaxAtmosphereDistance = height * (2.0f * radius + height);
-        var sqrtMaxAtmosphereDistance = Sqrt(sqMaxAtmosphereDistance);
-
-        var atmospherePropertiesBuffer = renderGraph.SetConstantBuffer
-        ((
-            rayleigh / settings.EarthScale,
-            settings.MieScatter / settings.EarthScale,
-            ColorspaceUtility.Rec709ToRec2020(settings.OzoneAbsorption) / settings.EarthScale,
-            settings.MieAbsorption / settings.EarthScale,
-            ColorspaceUtility.Rec709ToRec2020(settings.GroundColor.LinearFloat3()),
-            settings.MiePhase,
-            settings.RayleighHeight * settings.EarthScale,
-            settings.MieHeight * settings.EarthScale,
-            settings.OzoneWidth * settings.EarthScale,
-            settings.OzoneHeight * settings.EarthScale,
-            radius,
-            height,
-            radius + height,
-            settings.CloudScatter,
-            radiusSquared,
-            sqMaxAtmosphereDistance,
-            Rcp(sqrtMaxAtmosphereDistance),
-            sqrtMaxAtmosphereDistance
-        ));
-
-        var transmittanceRemap = GraphicsUtilities.HalfTexelRemap(settings.TransmittanceWidth, settings.TransmittanceHeight);
-        var multiScatterRemap = GraphicsUtilities.HalfTexelRemap(settings.MultiScatterWidth, settings.MultiScatterHeight);
-        var groundAmbientRemap = GraphicsUtilities.HalfTexelRemap(settings.AmbientGroundWidth);
-        var skyAmbientRemap = GraphicsUtilities.HalfTexelRemap(settings.AmbientSkyWidth, settings.AmbientSkyHeight);
-
-        var result = new AtmospherePropertiesAndTables(atmospherePropertiesBuffer, transmittance, multiScatter, groundAmbient, skyAmbient, transmittanceRemap, multiScatterRemap, skyAmbientRemap, groundAmbientRemap);
-
-        renderGraph.SetResource(result, true);
-
-        if (version >= settings.Version)
+        protected override void Cleanup(bool disposing)
         {
+            renderGraph.ReleasePersistentResource(transmittance, -1);
+            renderGraph.ReleasePersistentResource(multiScatter, -1);
+            renderGraph.ReleasePersistentResource(groundAmbient, -1);
+            renderGraph.ReleasePersistentResource(skyAmbient, -1);
+        }
+
+        public override void Render(ScriptableRenderContext context)
+        {
+            renderGraph.AddProfileBeginPass("Sky Tables");
+
+            float RayleighScattering(float wavelength)
+            {
+                var airRefractiveIndex = 1.000293f;
+                var Ns = 2.504e25f;
+                return 8 * Pow(Pi, 3) * Square(Square(airRefractiveIndex) - 1) / (3 * Ns * Pow(wavelength * 1e-9f, 4));
+            }
+
+            var rayleigh = new Float3(RayleighScattering(680), RayleighScattering(550), RayleighScattering(440));
+            rayleigh = ColorspaceUtility.Rec709ToRec2020(rayleigh);
+
+            // TODO: This doesn't work for some reason
+            //var rayleigh = new Float3(RayleighScattering(630), RayleighScattering(532), RayleighScattering(467));
+
+            var radius = settings.PlanetRadius * settings.EarthScale;
+            var height = settings.AtmosphereHeight * settings.EarthScale;
+
+            var radiusSquared = Sq(radius);
+            var sqMaxAtmosphereDistance = height * (2.0f * radius + height);
+            var sqrtMaxAtmosphereDistance = Sqrt(sqMaxAtmosphereDistance);
+
+            var atmospherePropertiesBuffer = renderGraph.SetConstantBuffer
+            ((
+                rayleigh / settings.EarthScale,
+                settings.MieScatter / settings.EarthScale,
+                ColorspaceUtility.Rec709ToRec2020(settings.OzoneAbsorption) / settings.EarthScale,
+                settings.MieAbsorption / settings.EarthScale,
+                ColorspaceUtility.Rec709ToRec2020(settings.GroundColor.LinearFloat3()),
+                settings.MiePhase,
+                settings.RayleighHeight * settings.EarthScale,
+                settings.MieHeight * settings.EarthScale,
+                settings.OzoneWidth * settings.EarthScale,
+                settings.OzoneHeight * settings.EarthScale,
+                radius,
+                height,
+                radius + height,
+                settings.CloudScatter,
+                radiusSquared,
+                sqMaxAtmosphereDistance,
+                Rcp(sqrtMaxAtmosphereDistance),
+                sqrtMaxAtmosphereDistance
+            ));
+
+            var transmittanceRemap = GraphicsUtilities.HalfTexelRemap(settings.TransmittanceWidth, settings.TransmittanceHeight);
+            var multiScatterRemap = GraphicsUtilities.HalfTexelRemap(settings.MultiScatterWidth, settings.MultiScatterHeight);
+            var groundAmbientRemap = GraphicsUtilities.HalfTexelRemap(settings.AmbientGroundWidth);
+            var skyAmbientRemap = GraphicsUtilities.HalfTexelRemap(settings.AmbientSkyWidth, settings.AmbientSkyHeight);
+
+            var result = new AtmospherePropertiesAndTables(atmospherePropertiesBuffer, transmittance, multiScatter, groundAmbient, skyAmbient, transmittanceRemap, multiScatterRemap, skyAmbientRemap, groundAmbientRemap);
+
+            renderGraph.SetResource(result, true);
+
+            if (version >= settings.Version)
+            {
+                renderGraph.AddProfileEndPass("Sky Tables");
+                return;
+            }
+
+            version = settings.Version;
+
+            // Generate transmittance LUT
+            using (var pass = renderGraph.AddFullscreenRenderPass("Atmosphere Transmittance", (settings.miePhase, result, settings)))
+            {
+                pass.Initialize(skyMaterial, new(settings.TransmittanceWidth, settings.TransmittanceHeight), 1, skyMaterial.FindPass("Transmittance Lookup"));
+                pass.WriteTexture(transmittance);
+                result.SetInputs(pass);
+
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    data.result.SetProperties(pass, command);
+                    pass.SetTexture(_MiePhaseTextureId, data.settings.miePhase);
+                    pass.SetFloat("_Samples", data.settings.TransmittanceSamples);
+                    pass.SetVector("TransmittanceScaleOffset", GraphicsUtilities.RemapHalfTexelTo01(data.settings.TransmittanceWidth, data.settings.TransmittanceHeight));
+                });
+            }
+
+            var computeShader = Resources.Load<ComputeShader>("Sky/PhysicalSky");
+
+            // Generate multi-scatter LUT
+            using (var pass = renderGraph.AddComputeRenderPass("Atmosphere Multi Scatter", (result, settings)))
+            {
+                pass.Initialize(computeShader, 0, settings.MultiScatterWidth, settings.MultiScatterHeight, 1, false);
+                pass.WriteTexture("_MultiScatterResult", multiScatter);
+                result.SetInputs(pass);
+
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    data.result.SetProperties(pass, command);
+                    pass.SetFloat("_Samples", data.settings.MultiScatterSamples);
+                    pass.SetVector("_ScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(data.settings.MultiScatterWidth, data.settings.MultiScatterHeight));
+                });
+            }
+
+            // Ambient Ground LUT
+            using (var pass = renderGraph.AddComputeRenderPass("Atmosphere Ambient Ground", (result, settings)))
+            {
+                pass.Initialize(computeShader, 1, settings.AmbientGroundWidth, 1, 1, false);
+                pass.WriteTexture("_AmbientGroundResult", groundAmbient);
+                result.SetInputs(pass);
+
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    data.result.SetProperties(pass, command);
+                    pass.SetFloat("_Samples", data.settings.AmbientGroundSamples);
+                    pass.SetVector("_ScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(data.settings.AmbientGroundWidth, 1));
+                });
+            }
+
+            // Ambient Sky LUT
+            using (var pass = renderGraph.AddComputeRenderPass("Atmosphere Ambient Sky", (result, settings)))
+            {
+                pass.Initialize(computeShader, 2, settings.AmbientSkyWidth, settings.AmbientSkyHeight, 1, false);
+                pass.WriteTexture("_AmbientSkyResult", skyAmbient);
+                result.SetInputs(pass);
+
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    data.result.SetProperties(pass, command);
+                    pass.SetFloat("_Samples", data.settings.AmbientSkySamples);
+                    pass.SetVector("_ScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(data.settings.AmbientSkyWidth, data.settings.AmbientSkyHeight));
+                });
+            }
+
             renderGraph.AddProfileEndPass("Sky Tables");
-            return;
         }
-
-        version = settings.Version;
-
-        // Generate transmittance LUT
-        using (var pass = renderGraph.AddFullscreenRenderPass("Atmosphere Transmittance", (settings.miePhase, result, settings)))
-        {
-            pass.Initialize(skyMaterial, new(settings.TransmittanceWidth, settings.TransmittanceHeight), 1, skyMaterial.FindPass("Transmittance Lookup"));
-            pass.WriteTexture(transmittance);
-            result.SetInputs(pass);
-
-            pass.SetRenderFunction(static (command, pass, data) =>
-            {
-                data.result.SetProperties(pass, command);
-                pass.SetTexture(_MiePhaseTextureId, data.settings.miePhase);
-                pass.SetFloat("_Samples", data.settings.TransmittanceSamples);
-                pass.SetVector("TransmittanceScaleOffset", GraphicsUtilities.RemapHalfTexelTo01(data.settings.TransmittanceWidth, data.settings.TransmittanceHeight));
-            });
-        }
-
-        var computeShader = Resources.Load<ComputeShader>("Sky/PhysicalSky");
-
-        // Generate multi-scatter LUT
-        using (var pass = renderGraph.AddComputeRenderPass("Atmosphere Multi Scatter", (result, settings)))
-        {
-            pass.Initialize(computeShader, 0, settings.MultiScatterWidth, settings.MultiScatterHeight, 1, false);
-            pass.WriteTexture("_MultiScatterResult", multiScatter);
-            result.SetInputs(pass);
-
-            pass.SetRenderFunction(static (command, pass, data) =>
-            {
-                data.result.SetProperties(pass, command);
-                pass.SetFloat("_Samples", data.settings.MultiScatterSamples);
-                pass.SetVector("_ScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(data.settings.MultiScatterWidth, data.settings.MultiScatterHeight));
-            });
-        }
-
-        // Ambient Ground LUT
-        using (var pass = renderGraph.AddComputeRenderPass("Atmosphere Ambient Ground", (result, settings)))
-        {
-            pass.Initialize(computeShader, 1, settings.AmbientGroundWidth, 1, 1, false);
-            pass.WriteTexture("_AmbientGroundResult", groundAmbient);
-            result.SetInputs(pass);
-
-            pass.SetRenderFunction(static (command, pass, data) =>
-            {
-                data.result.SetProperties(pass, command);
-                pass.SetFloat("_Samples", data.settings.AmbientGroundSamples);
-                pass.SetVector("_ScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(data.settings.AmbientGroundWidth, 1));
-            });
-        }
-
-        // Ambient Sky LUT
-        using (var pass = renderGraph.AddComputeRenderPass("Atmosphere Ambient Sky", (result, settings)))
-        {
-            pass.Initialize(computeShader, 2, settings.AmbientSkyWidth, settings.AmbientSkyHeight, 1, false);
-            pass.WriteTexture("_AmbientSkyResult", skyAmbient);
-            result.SetInputs(pass);
-
-            pass.SetRenderFunction(static (command, pass, data) =>
-            {
-                data.result.SetProperties(pass, command);
-                pass.SetFloat("_Samples", data.settings.AmbientSkySamples);
-                pass.SetVector("_ScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(data.settings.AmbientSkyWidth, data.settings.AmbientSkyHeight));
-            });
-        }
-
-        renderGraph.AddProfileEndPass("Sky Tables");
     }
 }

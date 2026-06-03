@@ -4,190 +4,193 @@ using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
 using Unmath;
 
-public partial class AutoExposure : ViewRenderFeature
+namespace CustomRenderPipeline
 {
-    private static readonly int ExposureCompensationTextureId = Shader.PropertyToID("ExposureCompensationTexture");
-
-    private readonly ColorGrading.Settings tonemappingSettings;
-    private readonly Settings settings;
-    private readonly LensSettings lensSettings;
-    private readonly ComputeShader computeShader;
-    private readonly Texture2D exposureTexture;
-
-    public AutoExposure(Settings settings, LensSettings lensSettings, RenderGraph renderGraph, ColorGrading.Settings tonemappingSettings) : base(renderGraph)
+    public partial class AutoExposure : ViewRenderFeature
     {
-        this.settings = settings;
-        this.lensSettings = lensSettings;
-        this.tonemappingSettings = tonemappingSettings;
-        computeShader = Resources.Load<ComputeShader>("PostProcessing/AutoExposure");
+        private static readonly int ExposureCompensationTextureId = Shader.PropertyToID("ExposureCompensationTexture");
 
-        var exposurePixels = ArrayPool<float>.Get(settings.ExposureResolution);
-        for (var i = 0; i < settings.ExposureResolution; i++)
+        private readonly ColorGrading.Settings tonemappingSettings;
+        private readonly Settings settings;
+        private readonly LensSettings lensSettings;
+        private readonly ComputeShader computeShader;
+        private readonly Texture2D exposureTexture;
+
+        public AutoExposure(Settings settings, LensSettings lensSettings, RenderGraph renderGraph, ColorGrading.Settings tonemappingSettings) : base(renderGraph)
         {
-            var uv = i / (settings.ExposureResolution - 1f);
-            var t = Mathf.Lerp(settings.MinEv, settings.MaxEv, uv);
-            var exposure = settings.ExposureCurve.Evaluate(t);
-            exposurePixels[i] = exposure;
-        }
+            this.settings = settings;
+            this.lensSettings = lensSettings;
+            this.tonemappingSettings = tonemappingSettings;
+            computeShader = Resources.Load<ComputeShader>("PostProcessing/AutoExposure");
 
-        exposureTexture = new Texture2D(settings.ExposureResolution, 1, TextureFormat.RFloat, false) { hideFlags = HideFlags.HideAndDontSave };
-        exposureTexture.SetPixelData(exposurePixels, 0);
-        ArrayPool<float>.Release(exposurePixels);
-        exposureTexture.Apply(false, false);
-    }
-
-    protected override void Cleanup(bool disposing)
-    {
-        // TODO: Rendergraph?
-        Object.DestroyImmediate(exposureTexture);
-    }
-
-    public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
-    {
-        // TODO: Only do when changed
-        var exposurePixels = exposureTexture.GetRawTextureData<float>();
-        for (var i = 0; i < settings.ExposureResolution; i++)
-        {
-            var uv = i / (settings.ExposureResolution - 1f);
-            var t = Mathf.Lerp(settings.MinEv, settings.MaxEv, uv);
-            var exposure = settings.ExposureCurve.Evaluate(t);
-            exposurePixels[i] = exposure;
-        }
-
-        exposureTexture.SetPixelData(exposurePixels, 0);
-        exposureTexture.Apply(false, false);
-
-        var histogram = renderGraph.GetBuffer(256);
-        using (var pass = renderGraph.AddComputeRenderPass("Auto Exposure", new AutoExposureStructData
-        (
-            settings.MinEv,
-            settings.MaxEv,
-            settings.AdaptationSpeed,
-            settings.ExposureCompensation,
-            viewPassData.iso,
-            viewPassData.aperture,
-            viewPassData.shutterSpeed,
-            settings.HistogramMin,
-            settings.HistogramMax,
-            GraphicsUtilities.HalfTexelRemap(settings.ExposureResolution, 1),
-            (float)settings.MeteringMode,
-            settings.ProceduralCenter,
-            settings.ProceduralRadii,
-            settings.ProceduralSoftness
-        )))
-        {
-            pass.Initialize(computeShader, 0, viewPassData.viewSize.x >> 1, viewPassData.viewSize.y >> 1);
-            pass.ReadRtHandle<CameraTarget>();
-            pass.WriteBuffer("LuminanceHistogram", histogram);
-            pass.ReadResource<AutoExposureData>();
-
-            pass.SetRenderFunction(static (command, pass, data) =>
+            var exposurePixels = ArrayPool<float>.Get(settings.ExposureResolution);
+            for (var i = 0; i < settings.ExposureResolution; i++)
             {
-                pass.SetFloat("MinEv", data.minEv);
-                pass.SetFloat("MaxEv", data.maxEv);
-                pass.SetFloat("AdaptationSpeed", data.adaptationSpeed);
-                pass.SetFloat("ExposureCompensation", data.exposureCompensation);
-                pass.SetFloat("Iso", data.iso);
-                pass.SetFloat("Aperture", data.aperture);
-                pass.SetFloat("ShutterSpeed", data.shutterSpeed);
-                pass.SetFloat("HistogramMin", data.histogramMin);
-                pass.SetFloat("HistogramMax", data.histogramMax);
-                pass.SetFloat("MeteringMode", data.meteringMode);
-                pass.SetVector("ExposureCompensationRemap", data.exposureCompensationRemap);
-                pass.SetVector("ProceduralCenter", data.ProceduralCenter);
-                pass.SetVector("ProceduralRadii", data.ProceduralRadii);
-                pass.SetFloat("ProceduralSoftness", data.ProceduralSoftness);
-            });
+                var uv = i / (settings.ExposureResolution - 1f);
+                var t = Mathf.Lerp(settings.MinEv, settings.MaxEv, uv);
+                var exposure = settings.ExposureCurve.Evaluate(t);
+                exposurePixels[i] = exposure;
+            }
+
+            exposureTexture = new Texture2D(settings.ExposureResolution, 1, TextureFormat.RFloat, false) { hideFlags = HideFlags.HideAndDontSave };
+            exposureTexture.SetPixelData(exposurePixels, 0);
+            ArrayPool<float>.Release(exposurePixels);
+            exposureTexture.Apply(false, false);
         }
 
-        var output = renderGraph.GetBuffer(1, 16, target: GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource);
-        var currentData = renderGraph.GetResource<AutoExposureData>();
-
-        using (var pass = renderGraph.AddComputeRenderPass("Auto Exposure", (settings.ExposureMode, exposureTexture, currentData.IsFirst, tonemappingSettings.PaperWhite)))
+        protected override void Cleanup(bool disposing)
         {
-            pass.Initialize(computeShader, 1, 1);
-            pass.ReadBuffer("LuminanceHistogram", histogram);
-            pass.WriteBuffer("LuminanceOutput", output);
-            pass.ReadResource<AutoExposureData>();
-            pass.ReadResource<FrameData>();
-            pass.ReadResource<ViewData>();
-
-            pass.SetRenderFunction(static (command, pass, data) =>
-            {
-                pass.SetFloat("Mode", (float)data.ExposureMode);
-                pass.SetFloat("IsFirst", data.IsFirst ? 1 : 0);
-                pass.SetTexture(ExposureCompensationTextureId, data.exposureTexture);
-                pass.SetFloat("PaperWhite", data.PaperWhite);
-            });
+            // TODO: Rendergraph?
+            Object.DestroyImmediate(exposureTexture);
         }
 
-        var exposureBuffer = renderGraph.GetResource<AutoExposureData>().ExposureBuffer;
-        using (var pass = renderGraph.AddGenericRenderPass("Auto Exposure", (output, exposureBuffer, settings.DebugExposure, renderGraph.RenderPipeline)))
+        public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
         {
-            pass.ReadBuffer("", output);
-            pass.WriteBuffer("", exposureBuffer);
-
-            pass.SetRenderFunction(static (command, pass, data) =>
+            // TODO: Only do when changed
+            var exposurePixels = exposureTexture.GetRawTextureData<float>();
+            for (var i = 0; i < settings.ExposureResolution; i++)
             {
-                command.CopyBuffer(pass.GetBuffer(data.output), pass.GetBuffer(data.exposureBuffer));
-                command.RequestAsyncReadback(pass.GetBuffer(data.exposureBuffer), readback =>
+                var uv = i / (settings.ExposureResolution - 1f);
+                var t = Mathf.Lerp(settings.MinEv, settings.MaxEv, uv);
+                var exposure = settings.ExposureCurve.Evaluate(t);
+                exposurePixels[i] = exposure;
+            }
+
+            exposureTexture.SetPixelData(exposurePixels, 0);
+            exposureTexture.Apply(false, false);
+
+            var histogram = renderGraph.GetBuffer(256);
+            using (var pass = renderGraph.AddComputeRenderPass("Auto Exposure", new AutoExposureStructData
+            (
+                settings.MinEv,
+                settings.MaxEv,
+                settings.AdaptationSpeed,
+                settings.ExposureCompensation,
+                viewPassData.iso,
+                viewPassData.aperture,
+                viewPassData.shutterSpeed,
+                settings.HistogramMin,
+                settings.HistogramMax,
+                GraphicsUtilities.HalfTexelRemap(settings.ExposureResolution, 1),
+                (float)settings.MeteringMode,
+                settings.ProceduralCenter,
+                settings.ProceduralRadii,
+                settings.ProceduralSoftness
+            )))
+            {
+                pass.Initialize(computeShader, 0, viewPassData.viewSize.x >> 1, viewPassData.viewSize.y >> 1);
+                pass.ReadRtHandle<CameraTarget>();
+                pass.WriteBuffer("LuminanceHistogram", histogram);
+                pass.ReadResource<AutoExposureData>();
+
+                pass.SetRenderFunction(static (command, pass, data) =>
                 {
-                    // When disposing, we wait all async requests which causes this to get triggered, but camera will be destroyed, so need to early return
-                    // TODO: Figure out better way
-                    if (data.RenderPipeline.IsDisposing)
-                        return;
-
-                    var readbackData = readback.GetData<float>();
-                    var exposure = readbackData[0];
-                    var exposureCompensation = readbackData[3];
-                    var ev100 = PhysicalCameraUtility.ExposureToEV100(exposure) + exposureCompensation;
-
-                    // TODO: Figure out a better way to do this since we no longer have access to camera directly
-                    //data.camera.iso = (int)PhysicalCameraUtility.ComputeISO(data.camera.aperture, data.camera.shutterSpeed, ev100);
-
-                    if (data.DebugExposure)
-                    {
-                        var luminance = PhysicalCameraUtility.EV100ToLuminance(ev100);
-                        Debug.Log($"EV: {ev100}. ({luminance} cd/m^2)");
-                    }
+                    pass.SetFloat("MinEv", data.minEv);
+                    pass.SetFloat("MaxEv", data.maxEv);
+                    pass.SetFloat("AdaptationSpeed", data.adaptationSpeed);
+                    pass.SetFloat("ExposureCompensation", data.exposureCompensation);
+                    pass.SetFloat("Iso", data.iso);
+                    pass.SetFloat("Aperture", data.aperture);
+                    pass.SetFloat("ShutterSpeed", data.shutterSpeed);
+                    pass.SetFloat("HistogramMin", data.histogramMin);
+                    pass.SetFloat("HistogramMax", data.histogramMax);
+                    pass.SetFloat("MeteringMode", data.meteringMode);
+                    pass.SetVector("ExposureCompensationRemap", data.exposureCompensationRemap);
+                    pass.SetVector("ProceduralCenter", data.ProceduralCenter);
+                    pass.SetVector("ProceduralRadii", data.ProceduralRadii);
+                    pass.SetFloat("ProceduralSoftness", data.ProceduralSoftness);
                 });
-            });
+            }
+
+            var output = renderGraph.GetBuffer(1, 16, target: GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource);
+            var currentData = renderGraph.GetResource<AutoExposureData>();
+
+            using (var pass = renderGraph.AddComputeRenderPass("Auto Exposure", (settings.ExposureMode, exposureTexture, currentData.IsFirst, tonemappingSettings.PaperWhite)))
+            {
+                pass.Initialize(computeShader, 1, 1);
+                pass.ReadBuffer("LuminanceHistogram", histogram);
+                pass.WriteBuffer("LuminanceOutput", output);
+                pass.ReadResource<AutoExposureData>();
+                pass.ReadResource<FrameData>();
+                pass.ReadResource<ViewData>();
+
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    pass.SetFloat("Mode", (float)data.ExposureMode);
+                    pass.SetFloat("IsFirst", data.IsFirst ? 1 : 0);
+                    pass.SetTexture(ExposureCompensationTextureId, data.exposureTexture);
+                    pass.SetFloat("PaperWhite", data.PaperWhite);
+                });
+            }
+
+            var exposureBuffer = renderGraph.GetResource<AutoExposureData>().ExposureBuffer;
+            using (var pass = renderGraph.AddGenericRenderPass("Auto Exposure", (output, exposureBuffer, settings.DebugExposure, renderGraph.RenderPipeline)))
+            {
+                pass.ReadBuffer("", output);
+                pass.WriteBuffer("", exposureBuffer);
+
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    command.CopyBuffer(pass.GetBuffer(data.output), pass.GetBuffer(data.exposureBuffer));
+                    command.RequestAsyncReadback(pass.GetBuffer(data.exposureBuffer), readback =>
+                    {
+                        // When disposing, we wait all async requests which causes this to get triggered, but camera will be destroyed, so need to early return
+                        // TODO: Figure out better way
+                        if (data.RenderPipeline.IsDisposing)
+                            return;
+
+                        var readbackData = readback.GetData<float>();
+                        var exposure = readbackData[0];
+                        var exposureCompensation = readbackData[3];
+                        var ev100 = PhysicalCameraUtility.ExposureToEV100(exposure) + exposureCompensation;
+
+                        // TODO: Figure out a better way to do this since we no longer have access to camera directly
+                        //data.camera.iso = (int)PhysicalCameraUtility.ComputeISO(data.camera.aperture, data.camera.shutterSpeed, ev100);
+
+                        if (data.DebugExposure)
+                        {
+                            var luminance = PhysicalCameraUtility.EV100ToLuminance(ev100);
+                            Debug.Log($"EV: {ev100}. ({luminance} cd/m^2)");
+                        }
+                    });
+                });
+            }
         }
     }
-}
 
-internal struct AutoExposureStructData
-{
-    public float minEv;
-    public float maxEv;
-    public float adaptationSpeed;
-    public float exposureCompensation;
-    public float iso;
-    public float aperture;
-    public float shutterSpeed;
-    public float histogramMin;
-    public float histogramMax;
-    public Float4 exposureCompensationRemap;
-    public float meteringMode;
-    public Float2 ProceduralCenter;
-    public Float2 ProceduralRadii;
-    public float ProceduralSoftness;
-
-    public AutoExposureStructData(float minEv, float maxEv, float adaptationSpeed, float exposureCompensation, float iso, float aperture, float shutterSpeed, float histogramMin, float histogramMax, Float4 exposureCompensationRemap, float meteringMode, Float2 proceduralCenter, Float2 proceduralRadii, float proceduralSoftness)
+    internal struct AutoExposureStructData
     {
-        this.minEv = minEv;
-        this.maxEv = maxEv;
-        this.adaptationSpeed = adaptationSpeed;
-        this.exposureCompensation = exposureCompensation;
-        this.iso = iso;
-        this.aperture = aperture;
-        this.shutterSpeed = shutterSpeed;
-        this.histogramMin = histogramMin;
-        this.histogramMax = histogramMax;
-        this.exposureCompensationRemap = exposureCompensationRemap;
-        this.meteringMode = meteringMode;
-        ProceduralCenter = proceduralCenter;
-        ProceduralRadii = proceduralRadii;
-        ProceduralSoftness = proceduralSoftness;
+        public float minEv;
+        public float maxEv;
+        public float adaptationSpeed;
+        public float exposureCompensation;
+        public float iso;
+        public float aperture;
+        public float shutterSpeed;
+        public float histogramMin;
+        public float histogramMax;
+        public Float4 exposureCompensationRemap;
+        public float meteringMode;
+        public Float2 ProceduralCenter;
+        public Float2 ProceduralRadii;
+        public float ProceduralSoftness;
+
+        public AutoExposureStructData(float minEv, float maxEv, float adaptationSpeed, float exposureCompensation, float iso, float aperture, float shutterSpeed, float histogramMin, float histogramMax, Float4 exposureCompensationRemap, float meteringMode, Float2 proceduralCenter, Float2 proceduralRadii, float proceduralSoftness)
+        {
+            this.minEv = minEv;
+            this.maxEv = maxEv;
+            this.adaptationSpeed = adaptationSpeed;
+            this.exposureCompensation = exposureCompensation;
+            this.iso = iso;
+            this.aperture = aperture;
+            this.shutterSpeed = shutterSpeed;
+            this.histogramMin = histogramMin;
+            this.histogramMax = histogramMax;
+            this.exposureCompensationRemap = exposureCompensationRemap;
+            this.meteringMode = meteringMode;
+            ProceduralCenter = proceduralCenter;
+            ProceduralRadii = proceduralRadii;
+            ProceduralSoftness = proceduralSoftness;
+        }
     }
 }

@@ -1,22 +1,25 @@
 ﻿using UnityEngine;
 using UnityEngine.Rendering;
 
-public readonly struct UnderwaterLightingResult : IRenderPassData
+namespace CustomRenderPipeline
 {
-    private readonly ResourceHandle<RenderTexture> underwaterLighting;
-
-    public UnderwaterLightingResult(ResourceHandle<RenderTexture> waterNormalFoam)
+    public readonly struct UnderwaterLightingResult : IRenderPassData
     {
-        underwaterLighting = waterNormalFoam;
+        private readonly ResourceHandle<RenderTexture> underwaterLighting;
+
+        public UnderwaterLightingResult(ResourceHandle<RenderTexture> waterNormalFoam)
+        {
+            underwaterLighting = waterNormalFoam;
+        }
+
+        void IRenderPassData.SetInputs(RenderPass pass)
+        {
+            pass.ReadTexture("_UnderwaterResult", underwaterLighting);
+        }
+
+        void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
+        {
+            pass.SetVector("_UnderwaterResultScaleLimit", pass.RenderGraph.GetScaleLimit2D(underwaterLighting));
+        }
     }
-
-	void IRenderPassData.SetInputs(RenderPass pass)
-	{
-        pass.ReadTexture("_UnderwaterResult", underwaterLighting);
-	}
-
-	void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
-	{
-        pass.SetVector("_UnderwaterResultScaleLimit", pass.RenderGraph.GetScaleLimit2D(underwaterLighting));
-	}
 }

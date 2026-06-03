@@ -2,101 +2,104 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using Unmath;
 
-public class ShadowRenderPass<T> : GraphicsRenderPass<T>
+namespace CustomRenderPipeline
 {
-    private RendererList rendererList;
-    private float bias, slopeBias;
-	private bool zClip;
-	private bool isPointLight;
+    public class ShadowRenderPass<T> : GraphicsRenderPass<T>
+    {
+        private RendererList rendererList;
+        private float bias, slopeBias;
+        private bool zClip;
+        private bool isPointLight;
 
-	public void Initialize(ScriptableRenderContext context, in CullingResults cullingResults, int lightIndex, float bias, float slopeBias, bool zClip, bool isPointLight, Int2 size, int viewCount)
-	{
-		this.bias = bias;
-		this.slopeBias = slopeBias;
-		this.zClip = zClip;
-		this.isPointLight = isPointLight;
+        public void Initialize(ScriptableRenderContext context, in CullingResults cullingResults, int lightIndex, float bias, float slopeBias, bool zClip, bool isPointLight, Int2 size, int viewCount)
+        {
+            this.bias = bias;
+            this.slopeBias = slopeBias;
+            this.zClip = zClip;
+            this.isPointLight = isPointLight;
 
-        Size = size;
-        ViewCount = viewCount;
+            Size = size;
+            ViewCount = viewCount;
 
-        var shadowDrawingSettings = new ShadowDrawingSettings(cullingResults, lightIndex);
-        shadowDrawingSettings.useRenderingLayerMaskTest = true;
-        rendererList = context.CreateShadowRendererList(ref shadowDrawingSettings);
+            var shadowDrawingSettings = new ShadowDrawingSettings(cullingResults, lightIndex);
+            shadowDrawingSettings.useRenderingLayerMaskTest = true;
+            rendererList = context.CreateShadowRendererList(ref shadowDrawingSettings);
+        }
+
+        public override void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
+        {
+            Command.SetGlobalTexture(propertyName, texture);
+        }
+
+        public override void SetBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer)
+        {
+            Command.SetGlobalBuffer(propertyName, GetBuffer(buffer));
+        }
+
+        public override void SetVector(int propertyName, Float4 value)
+        {
+            Command.SetGlobalVector(propertyName, value);
+        }
+
+        public override void SetVectorArray(string propertyName, Vector4[] value)
+        {
+            Command.SetGlobalVectorArray(propertyName, value);
+        }
+
+        public override void SetFloat(string propertyName, float value)
+        {
+            Command.SetGlobalFloat(propertyName, value);
+        }
+
+        public override void SetFloatArray(string propertyName, float[] value)
+        {
+            Command.SetGlobalFloatArray(propertyName, value);
+        }
+
+        public override void SetInt(string propertyName, int value)
+        {
+            Command.SetGlobalInt(propertyName, value);
+        }
+
+        protected override void Execute()
+        {
+            foreach (var keyword in keywords)
+                Command.EnableKeyword(new GlobalKeyword(keyword));
+
+            Command.SetGlobalDepthBias(bias, slopeBias);
+            Command.SetGlobalInt("ZClip", zClip ? 1 : 0);
+
+            if (isPointLight)
+                Command.EnableShaderKeyword("POINT_LIGHT");
+
+            Command.DrawRendererList(rendererList);
+
+            if (isPointLight)
+                Command.DisableShaderKeyword("POINT_LIGHT");
+
+            Command.SetGlobalDepthBias(0.0f, 0.0f);
+            Command.SetGlobalInt("ZClip", 1);
+
+            foreach (var keyword in keywords)
+                Command.DisableKeyword(new GlobalKeyword(keyword));
+        }
+
+        public override void SetMatrix(string propertyName, Matrix4x4 value)
+        {
+            Command.SetGlobalMatrix(propertyName, value);
+        }
+
+        public override void SetConstantBuffer(string propertyName, ResourceHandle<GraphicsBuffer> value, int size, int offset)
+        {
+            var descriptor = RenderGraph.BufferHandleSystem.GetDescriptor(value);
+            if (size == 0)
+                size = descriptor.Count * descriptor.Stride;
+            Command.SetGlobalConstantBuffer(GetBuffer(value), propertyName, offset, size);
+        }
+
+        public override void SetMatrixArray(string propertyName, Matrix4x4[] value)
+        {
+            Command.SetGlobalMatrixArray(propertyName, value);
+        }
     }
-
-	public override void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
-	{
-		Command.SetGlobalTexture(propertyName, texture);
-	}
-
-	public override void SetBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer)
-	{
-		Command.SetGlobalBuffer(propertyName, GetBuffer(buffer));
-	}
-
-	public override void SetVector(int propertyName, Float4 value)
-	{
-		Command.SetGlobalVector(propertyName, value);
-	}
-
-	public override void SetVectorArray(string propertyName, Vector4[] value)
-	{
-		Command.SetGlobalVectorArray(propertyName, value);
-	}
-
-	public override void SetFloat(string propertyName, float value)
-	{
-		Command.SetGlobalFloat(propertyName, value);
-	}
-
-	public override void SetFloatArray(string propertyName, float[] value)
-	{
-		Command.SetGlobalFloatArray(propertyName, value);
-	}
-
-	public override void SetInt(string propertyName, int value)
-	{
-		Command.SetGlobalInt(propertyName, value);
-	}
-
-	protected override void Execute()
-	{
-		foreach (var keyword in keywords)
-			Command.EnableKeyword(new GlobalKeyword(keyword));
-
-		Command.SetGlobalDepthBias(bias, slopeBias);
-		Command.SetGlobalInt("ZClip", zClip ? 1 : 0);
-
-		if (isPointLight)
-			Command.EnableShaderKeyword("POINT_LIGHT");
-
-        Command.DrawRendererList(rendererList);
-
-		if (isPointLight)
-			Command.DisableShaderKeyword("POINT_LIGHT");
-
-		Command.SetGlobalDepthBias(0.0f, 0.0f);
-		Command.SetGlobalInt("ZClip", 1);
-
-		foreach (var keyword in keywords)
-			Command.DisableKeyword(new GlobalKeyword(keyword));
-	}
-
-	public override void SetMatrix(string propertyName, Matrix4x4 value)
-	{
-		Command.SetGlobalMatrix(propertyName, value);
-	}
-
-	public override void SetConstantBuffer(string propertyName, ResourceHandle<GraphicsBuffer> value, int size, int offset)
-	{
-		var descriptor = RenderGraph.BufferHandleSystem.GetDescriptor(value);
-		if (size == 0)
-			size = descriptor.Count * descriptor.Stride;
-		Command.SetGlobalConstantBuffer(GetBuffer(value), propertyName, offset, size);
-	}
-
-	public override void SetMatrixArray(string propertyName, Matrix4x4[] value)
-	{
-		Command.SetGlobalMatrixArray(propertyName, value);
-	}
 }

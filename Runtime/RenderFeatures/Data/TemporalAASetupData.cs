@@ -1,20 +1,23 @@
 ﻿using UnityEngine.Rendering;
 using Unmath;
 
-public readonly struct TemporalAASetupData : IRenderPassData
+namespace CustomRenderPipeline
 {
-	public readonly Float2 jitter;
-
-    public TemporalAASetupData(Float2 jitter)
+    public readonly struct TemporalAASetupData : IRenderPassData
     {
-        this.jitter = jitter;
+        public readonly Float2 jitter;
+
+        public TemporalAASetupData(Float2 jitter)
+        {
+            this.jitter = jitter;
+        }
+
+        void IRenderPassData.SetInputs(RenderPass pass)
+        {
+        }
+
+        void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
+        {
+        }
     }
-
-	void IRenderPassData.SetInputs(RenderPass pass)
-	{
-	}
-
-	void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
-	{
-	}
 }

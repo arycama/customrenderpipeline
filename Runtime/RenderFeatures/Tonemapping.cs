@@ -5,144 +5,146 @@ using UnityEngine.Rendering;
 using Unmath;
 using static Unmath.Math;
 
-public partial class Tonemapping : ViewRenderFeature
+namespace CustomRenderPipeline
 {
-    private readonly Material tonemapMaterial;
-    private readonly ColorGrading.Settings colorGradingSettings;
-    private readonly Bloom.Settings bloomSettings;
-    // private Matrix4x4 RgbToLmsr;
-    //private Matrix4x4 LmsToRgb;
-
-    //private bool previousNormalize;
-    private readonly HashSet<int> renderedViewIndices = new();
-
-    public Tonemapping(RenderGraph renderGraph, ColorGrading.Settings colorGradingSettings, Bloom.Settings bloomSettings) : base(renderGraph)
+    public partial class Tonemapping : ViewRenderFeature
     {
-        this.colorGradingSettings = colorGradingSettings;
-        this.bloomSettings = bloomSettings;
-        tonemapMaterial = new Material(Shader.Find("Hidden/Tonemap")) { hideFlags = HideFlags.HideAndDontSave };
-    }
+        private readonly Material tonemapMaterial;
+        private readonly ColorGrading.Settings colorGradingSettings;
+        private readonly Bloom.Settings bloomSettings;
+        // private Matrix4x4 RgbToLmsr;
+        //private Matrix4x4 LmsToRgb;
 
-    public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
-    {
-        var colorGrading = renderGraph.GetResource<ColorGrading.Result>();
-        var isFirst = renderedViewIndices.Add(viewPassData.viewId);
+        //private bool previousNormalize;
+        private readonly HashSet<int> renderedViewIndices = new();
 
-        var halfViewSize = new Int2(viewPassData.viewSize.x >> 1, viewPassData.viewSize.y >> 1);
+        public Tonemapping(RenderGraph renderGraph, ColorGrading.Settings colorGradingSettings, Bloom.Settings bloomSettings) : base(renderGraph)
+        {
+            this.colorGradingSettings = colorGradingSettings;
+            this.bloomSettings = bloomSettings;
+            tonemapMaterial = new Material(Shader.Find("Hidden/Tonemap")) { hideFlags = HideFlags.HideAndDontSave };
+        }
 
-        using var pass = renderGraph.AddBlitToScreenPass("Tonemapping", (
-            viewPassData.viewSize,
-            GraphicsUtilities.HalfTexelRemap(colorGradingSettings.Resolution),
-            colorGradingSettings.PaperWhite * Sqrt(2.0f),
-            bloomSettings.Strength,
-            displayOutputData.peakLuminance,
-            colorGrading.colorGrading,
-            halfViewSize,
-            renderGraph.RtHandleSystem));
+        public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+        {
+            var colorGrading = renderGraph.GetResource<ColorGrading.Result>();
+            var isFirst = renderedViewIndices.Add(viewPassData.viewId);
 
-        pass.Initialize(tonemapMaterial, viewPassData.viewSize, viewPassData.viewCount, 0, false, 1, viewPassData.target, viewPassData.format);
-        pass.PreventNewSubPass = true;
+            var halfViewSize = new Int2(viewPassData.viewSize.x >> 1, viewPassData.viewSize.y >> 1);
 
-        pass.ReadRtHandle<CameraTarget>();
-        //pass.ReadRtHandle<ColorGradingTexture>();
-        pass.ReadResource<ScreenSpaceReflectionResult>(true);
-        pass.ReadResource<ScreenSpaceDiffuse.Result>(true);
-        pass.ReadResource<ViewData>();
+            using var pass = renderGraph.AddBlitToScreenPass("Tonemapping", (
+                viewPassData.viewSize,
+                GraphicsUtilities.HalfTexelRemap(colorGradingSettings.Resolution),
+                colorGradingSettings.PaperWhite * Sqrt(2.0f),
+                bloomSettings.Strength,
+                displayOutputData.peakLuminance,
+                colorGrading.colorGrading,
+                halfViewSize,
+                renderGraph.RtHandleSystem));
+
+            pass.Initialize(tonemapMaterial, viewPassData.viewSize, viewPassData.viewCount, 0, false, 1, viewPassData.target, viewPassData.format);
+            pass.PreventNewSubPass = true;
+
+            pass.ReadRtHandle<CameraTarget>();
+            //pass.ReadRtHandle<ColorGradingTexture>();
+            pass.ReadResource<ScreenSpaceReflectionResult>(true);
+            pass.ReadResource<ScreenSpaceDiffuse.Result>(true);
+            pass.ReadResource<ViewData>();
 
 #if UNITY_EDITOR
-        if (pass.TryReadResource<GizmosTarget>())
-            pass.AddKeyword("GIZMOS_ON");
+            if (pass.TryReadResource<GizmosTarget>())
+                pass.AddKeyword("GIZMOS_ON");
 #endif
 
-        if (bloomSettings.Strength > 0.0f)
-        {
-            pass.ReadRtHandle<CameraBloom>();
-            pass.AddKeyword("BLOOM");
-        }
-
-        var colorGamut = displayOutputData.colorGamut;
-        var keyword = colorGamut switch
-        {
-            ColorGamut.sRGB => "SRGB",
-            ColorGamut.Rec709 => "REC709",
-            ColorGamut.Rec2020 => "REC2020",
-            ColorGamut.DisplayP3 => "DISPLAYP3",
-            ColorGamut.HDR10 => "HDR10",
-            ColorGamut.DolbyHDR => "DOLBYHDR",
-            ColorGamut.P3D65G22 => "P3D65G22",
-            _ => throw new NotImplementedException(colorGamut.ToString()),
-        };
-
-        pass.AddKeyword(keyword);
-
-        // Unity does some annoying tonemapping in scene view, to get consistent results between scene and game mode, need to reverse it
-        if (viewPassData.cameraType == CameraType.SceneView)
-            pass.AddKeyword("SCENE_VIEW");
-
-        if (viewPassData.cameraType == CameraType.Preview)
-            pass.AddKeyword("PREVIEW");
-
-        pass.SetRenderFunction(static (command, pass, data) =>
-        {
-            pass.SetVector("Resolution", data.viewSize);
-            pass.SetVector("LutScaleOffset", data.Item2);
-            pass.SetFloat("PaperWhite", data.Item3);
-            pass.SetFloat("BloomStrength", data.Item4);
-            pass.SetFloat("MaxLuminance", data.Item5);
-            pass.PropertyBlock.SetTexture("ColorGrading", data.colorGrading);
-
-            var bloomScaleLimit = GraphicsUtilities.ScaleLimit(data.halfViewSize, data.RtHandleSystem.ScreenSize);
-            pass.SetVector("CameraBloomScaleLimit", bloomScaleLimit);
-        });
-    }
-
-    private Matrix4x4 CalculateRgbToLMSR(bool normalize)
-    {
-        //const int CieD65Interval = 1;
-        //const int CIE_D65_START = 390;
-        //const int CIE_D65_END = 790;
-        const int CIE_D65_COUNT = 401;
-        const int CIE_LMSR_COUNT = 401;
-
-        var l = Float3.Zero;
-        var m = Float3.Zero;
-        var s = Float3.Zero;
-        var r = Float3.Zero;
-
-        for (var j = 0; j < 3; j++)
-        {
-            for (var w = 0; w < CIE_LMSR_COUNT; w++)
+            if (bloomSettings.Strength > 0.0f)
             {
-                l[j] += CieLmsr[w].x * CieD65[w] * Rec709Reflectance[w][j];
-                m[j] += CieLmsr[w].y * CieD65[w] * Rec709Reflectance[w][j];
-                s[j] += CieLmsr[w].z * CieD65[w] * Rec709Reflectance[w][j];
-                r[j] += CieLmsr[w].w * CieD65[w] * Rec709Reflectance[w][j];
+                pass.ReadRtHandle<CameraBloom>();
+                pass.AddKeyword("BLOOM");
             }
-        }
 
-        float norm = CIE_LMSR_COUNT;
-        if (normalize)
-        {
-            norm = 0.0f;
-            for (var i = 0; i < CIE_D65_COUNT; i++)
+            var colorGamut = displayOutputData.colorGamut;
+            var keyword = colorGamut switch
             {
-                norm += CieY[i] * CieD65[i];
-            }
+                ColorGamut.sRGB => "SRGB",
+                ColorGamut.Rec709 => "REC709",
+                ColorGamut.Rec2020 => "REC2020",
+                ColorGamut.DisplayP3 => "DISPLAYP3",
+                ColorGamut.HDR10 => "HDR10",
+                ColorGamut.DolbyHDR => "DOLBYHDR",
+                ColorGamut.P3D65G22 => "P3D65G22",
+                _ => throw new NotImplementedException(colorGamut.ToString()),
+            };
+
+            pass.AddKeyword(keyword);
+
+            // Unity does some annoying tonemapping in scene view, to get consistent results between scene and game mode, need to reverse it
+            if (viewPassData.cameraType == CameraType.SceneView)
+                pass.AddKeyword("SCENE_VIEW");
+
+            if (viewPassData.cameraType == CameraType.Preview)
+                pass.AddKeyword("PREVIEW");
+
+            pass.SetRenderFunction(static (command, pass, data) =>
+            {
+                pass.SetVector("Resolution", data.viewSize);
+                pass.SetVector("LutScaleOffset", data.Item2);
+                pass.SetFloat("PaperWhite", data.Item3);
+                pass.SetFloat("BloomStrength", data.Item4);
+                pass.SetFloat("MaxLuminance", data.Item5);
+                pass.PropertyBlock.SetTexture("ColorGrading", data.colorGrading);
+
+                var bloomScaleLimit = GraphicsUtilities.ScaleLimit(data.halfViewSize, data.RtHandleSystem.ScreenSize);
+                pass.SetVector("CameraBloomScaleLimit", bloomScaleLimit);
+            });
         }
-        norm = 1.0f / norm;
 
-        var result = new Matrix4x4();
-        result.SetRow(0, new Float4(l * norm, 0));
-        result.SetRow(1, new Float4(m * norm, 0));
-        result.SetRow(2, new Float4(s * norm, 0));
-        result.SetRow(3, new Float4(r * norm, 1));
-        return result;
-    }
+        private Matrix4x4 CalculateRgbToLMSR(bool normalize)
+        {
+            //const int CieD65Interval = 1;
+            //const int CIE_D65_START = 390;
+            //const int CIE_D65_END = 790;
+            const int CIE_D65_COUNT = 401;
+            const int CIE_LMSR_COUNT = 401;
 
-    // CIE 1931 reflectance spectrum for Rec.709 from 390nm to 790nm
-    // Data source: http://scottburns.us/fast-rgb-to-spectrum-conversion-for-reflectances/
-    private static readonly Float3[] Rec709Reflectance = new Float3[401]
-    {
+            var l = Float3.Zero;
+            var m = Float3.Zero;
+            var s = Float3.Zero;
+            var r = Float3.Zero;
+
+            for (var j = 0; j < 3; j++)
+            {
+                for (var w = 0; w < CIE_LMSR_COUNT; w++)
+                {
+                    l[j] += CieLmsr[w].x * CieD65[w] * Rec709Reflectance[w][j];
+                    m[j] += CieLmsr[w].y * CieD65[w] * Rec709Reflectance[w][j];
+                    s[j] += CieLmsr[w].z * CieD65[w] * Rec709Reflectance[w][j];
+                    r[j] += CieLmsr[w].w * CieD65[w] * Rec709Reflectance[w][j];
+                }
+            }
+
+            float norm = CIE_LMSR_COUNT;
+            if (normalize)
+            {
+                norm = 0.0f;
+                for (var i = 0; i < CIE_D65_COUNT; i++)
+                {
+                    norm += CieY[i] * CieD65[i];
+                }
+            }
+            norm = 1.0f / norm;
+
+            var result = new Matrix4x4();
+            result.SetRow(0, new Float4(l * norm, 0));
+            result.SetRow(1, new Float4(m * norm, 0));
+            result.SetRow(2, new Float4(s * norm, 0));
+            result.SetRow(3, new Float4(r * norm, 1));
+            return result;
+        }
+
+        // CIE 1931 reflectance spectrum for Rec.709 from 390nm to 790nm
+        // Data source: http://scottburns.us/fast-rgb-to-spectrum-conversion-for-reflectances/
+        private static readonly Float3[] Rec709Reflectance = new Float3[401]
+        {
         new(0.028818291f, 0.011877002f, 0.959304707f),
         new(0.028818291f, 0.011877002f, 0.959304707f),
         new(0.028818291f, 0.011877002f, 0.959304707f),
@@ -544,13 +546,13 @@ public partial class Tonemapping : ViewRenderFeature
         new(0.976087481f, 0.012684050f, 0.011228468f),
         new(0.976087481f, 0.012684050f, 0.011228468f),
         new(0.976087481f, 0.012684050f, 0.011228468f)
-    };
+        };
 
-    // Cone (LMS) data from: Stockman & Sharpe (2000) / 2-deg fundamentals based on the
-    // Stiles & Burch 10-deg CMFs (adjusted to 2-deg). Data source: http://www.cvrl.org/cones.htm
-    // Rod (R)  data from: CIE (1951) Scotopic V'(λ). Data source: http://www.cvrl.org/lumindex.htm
-    private static readonly Float4[] CieLmsr = new Float4[401]
-    {
+        // Cone (LMS) data from: Stockman & Sharpe (2000) / 2-deg fundamentals based on the
+        // Stiles & Burch 10-deg CMFs (adjusted to 2-deg). Data source: http://www.cvrl.org/cones.htm
+        // Rod (R)  data from: CIE (1951) Scotopic V'(λ). Data source: http://www.cvrl.org/lumindex.htm
+        private static readonly Float4[] CieLmsr = new Float4[401]
+        {
         new(4.15003E-04f, 3.68349E-04f, 9.54729E-03f, 0.0022090000f),
         new(5.02650E-04f, 4.48015E-04f, 1.14794E-02f, 0.0025470000f),
         new(6.07367E-04f, 5.43965E-04f, 1.37986E-02f, 0.0029390000f),
@@ -952,12 +954,12 @@ public partial class Tonemapping : ViewRenderFeature
         new(1.24263E-05f, 1.01247E-06f, 0, 0),
         new(1.16618E-05f, 9.54130E-07f, 0, 0),
         new(1.09446E-05f, 8.99170E-07f, 0, 0),
-    };
+        };
 
-    // CIE 1931 2-deg, XYZ CMFs, Y only
-    // Data source: http://www.cvrl.org/cmfs.htm
-    private static readonly float[] CieY = new float[401]
-    {
+        // CIE 1931 2-deg, XYZ CMFs, Y only
+        // Data source: http://www.cvrl.org/cmfs.htm
+        private static readonly float[] CieY = new float[401]
+        {
         0.000120000000f,
         0.000134984000f,
         0.000151492000f,
@@ -1359,14 +1361,14 @@ public partial class Tonemapping : ViewRenderFeature
         0.000008592362f,
         0.000008009133f,
         0.000007465700f,
-    };
+        };
 
-    // CIE Standard Illuminant D65 relative spectral power distribution,
-    // from 390nm to 790nm, at 1nm intervals
-    // https://en.wikipedia.org/wiki/Illuminant_D65
-    // https://www.rit.edu/cos/colorscience/rc_useful_data.php
-    private static readonly float[] CieD65 = new float[401]
-    {
+        // CIE Standard Illuminant D65 relative spectral power distribution,
+        // from 390nm to 790nm, at 1nm intervals
+        // https://en.wikipedia.org/wiki/Illuminant_D65
+        // https://www.rit.edu/cos/colorscience/rc_useful_data.php
+        private static readonly float[] CieD65 = new float[401]
+        {
         54.6482f,
         57.4589f,
         60.2695f,
@@ -1768,5 +1770,6 @@ public partial class Tonemapping : ViewRenderFeature
         64.1198f,
         64.2119f,
         64.304f
-    };
+        };
+    }
 }

@@ -2,74 +2,77 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 
-public class DeferredLighting : ViewRenderFeature
+namespace CustomRenderPipeline
 {
-	private readonly Material material;
-	private readonly Sky.Settings skySettings;
-
-	public DeferredLighting(RenderGraph renderGraph, Sky.Settings skySettings) : base(renderGraph)
-	{
-		material = new Material(Shader.Find("Hidden/Deferred Lighting")) { hideFlags = HideFlags.HideAndDontSave };
-		this.skySettings = skySettings;
-	}
-
-	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+    public class DeferredLighting : ViewRenderFeature
     {
-        var viewSize = viewPassData.viewSize;
+        private readonly Material material;
+        private readonly Sky.Settings skySettings;
 
-		void RenderPass(int index)
-		{
-			using var pass = renderGraph.AddFullscreenRenderPass("Deferred Lighting");
+        public DeferredLighting(RenderGraph renderGraph, Sky.Settings skySettings) : base(renderGraph)
+        {
+            material = new Material(Shader.Find("Hidden/Deferred Lighting")) { hideFlags = HideFlags.HideAndDontSave };
+            this.skySettings = skySettings;
+        }
 
-			pass.Initialize(material, viewSize, 1, index, isScreenPass: true);
-			pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
-			pass.WriteRtHandle<CameraTarget>();
+        public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+        {
+            var viewSize = viewPassData.viewSize;
 
-			pass.ReadResource<DfgData>();
-			pass.ReadResource<FrameData>();
-			pass.ReadResource<EnvironmentData>();
-			pass.ReadResource<ViewData>();
-			pass.ReadResource<LightingData>();
-			pass.ReadResource<ShadowData>();
-			pass.ReadResource<AutoExposureData>();
-
-			pass.ReadRtHandle<CameraDepth>();
-			pass.ReadRtHandle<CameraStencil>();
-			pass.ReadRtHandle<GBufferAlbedoMetallic>();
-			pass.ReadRtHandle<GBufferNormalRoughness>();
-			pass.ReadRtHandle<GBufferBentNormalOcclusion>();
-			pass.ReadResource<AtmospherePropertiesAndTables>();
-			pass.ReadResource<TemporalAAData>();
-
-			pass.ReadResource<SkyViewTransmittanceData>();
-			pass.ReadResource<CloudShadowDataResult>();
-
-			pass.ReadResource<LightingSetup.Result>();
-			pass.ReadResource<ClusteredLightCulling.Result>();
-			pass.ReadResource<VolumetricLighting.Result>();
-
-            pass.ReadResource<ParticleShadowData>();
-
-            if(renderGraph.TryGetResource<ScreenSpaceDiffuse.Result>(out _))
+            void RenderPass(int index)
             {
-                pass.ReadResource<ScreenSpaceDiffuse.Result>();
-                pass.AddKeyword("SCREEN_SPACE_GLOBAL_ILLUMINATION_ON");
+                using var pass = renderGraph.AddFullscreenRenderPass("Deferred Lighting");
+
+                pass.Initialize(material, viewSize, 1, index, isScreenPass: true);
+                pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
+                pass.WriteRtHandle<CameraTarget>();
+
+                pass.ReadResource<DfgData>();
+                pass.ReadResource<FrameData>();
+                pass.ReadResource<EnvironmentData>();
+                pass.ReadResource<ViewData>();
+                pass.ReadResource<LightingData>();
+                pass.ReadResource<ShadowData>();
+                pass.ReadResource<AutoExposureData>();
+
+                pass.ReadRtHandle<CameraDepth>();
+                pass.ReadRtHandle<CameraStencil>();
+                pass.ReadRtHandle<GBufferAlbedoMetallic>();
+                pass.ReadRtHandle<GBufferNormalRoughness>();
+                pass.ReadRtHandle<GBufferBentNormalOcclusion>();
+                pass.ReadResource<AtmospherePropertiesAndTables>();
+                pass.ReadResource<TemporalAAData>();
+
+                pass.ReadResource<SkyViewTransmittanceData>();
+                pass.ReadResource<CloudShadowDataResult>();
+
+                pass.ReadResource<LightingSetup.Result>();
+                pass.ReadResource<ClusteredLightCulling.Result>();
+                pass.ReadResource<VolumetricLighting.Result>();
+
+                pass.ReadResource<ParticleShadowData>();
+
+                if (renderGraph.TryGetResource<ScreenSpaceDiffuse.Result>(out _))
+                {
+                    pass.ReadResource<ScreenSpaceDiffuse.Result>();
+                    pass.AddKeyword("SCREEN_SPACE_GLOBAL_ILLUMINATION_ON");
+                }
+
+                if (renderGraph.TryGetResource<ScreenSpaceReflectionResult>(out _))
+                {
+                    pass.ReadResource<ScreenSpaceReflectionResult>();
+                    pass.AddKeyword("SCREENSPACE_REFLECTIONS_ON");
+                }
+
+                if (renderGraph.TryGetResource<ScreenSpaceShadows.Result>(out _))
+                {
+                    pass.ReadResource<ScreenSpaceShadows.Result>();
+                    pass.AddKeyword("SCREEN_SPACE_SHADOWS_ON");
+                }
             }
 
-            if (renderGraph.TryGetResource<ScreenSpaceReflectionResult>(out _))
-            {
-                pass.ReadResource<ScreenSpaceReflectionResult>();
-                pass.AddKeyword("SCREENSPACE_REFLECTIONS_ON");
-            }
-
-            if (renderGraph.TryGetResource<ScreenSpaceShadows.Result>(out _))
-            {
-                pass.ReadResource<ScreenSpaceShadows.Result>();
-                pass.AddKeyword("SCREEN_SPACE_SHADOWS_ON");
-            }
-		}
-
-		RenderPass(0); // No translucency
-		RenderPass(1); // Translucency
-	}
+            RenderPass(0); // No translucency
+            RenderPass(1); // Translucency
+        }
+    }
 }

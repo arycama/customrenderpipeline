@@ -2,41 +2,44 @@ using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-public class ScreenSpaceTerrain : ViewRenderFeature
+namespace CustomRenderPipeline
 {
-    private readonly Material material;
-    private readonly TerrainSettings settings;
-
-    public ScreenSpaceTerrain(RenderGraph renderGraph, TerrainSettings settings) : base(renderGraph)
+    public class ScreenSpaceTerrain : ViewRenderFeature
     {
-        this.settings = settings;
-        material = new Material(Shader.Find("Hidden/Screen Space Terrain")) { hideFlags = HideFlags.HideAndDontSave };
-    }
+        private readonly Material material;
+        private readonly TerrainSettings settings;
 
-    public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
-    {
-        if (viewPassData.cameraType == CameraType.Preview)
-            return;
+        public ScreenSpaceTerrain(RenderGraph renderGraph, TerrainSettings settings) : base(renderGraph)
+        {
+            this.settings = settings;
+            material = new Material(Shader.Find("Hidden/Screen Space Terrain")) { hideFlags = HideFlags.HideAndDontSave };
+        }
 
-        if (!renderGraph.TryGetResource<TerrainViewData>(out _))
-            return;
+        public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+        {
+            if (viewPassData.cameraType == CameraType.Preview)
+                return;
 
-        using var pass = renderGraph.AddFullscreenRenderPass("Screen Space Terrain");
-        pass.PreventNewSubPass = true;
+            if (!renderGraph.TryGetResource<TerrainViewData>(out _))
+                return;
 
-        pass.Initialize(material, viewPassData.viewSize, viewPassData.viewCount, isScreenPass: true);
-        pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
-        pass.WriteRtHandle<GBufferAlbedoMetallic>();
-        pass.WriteRtHandle<GBufferNormalRoughness>();
-        pass.WriteRtHandle<GBufferBentNormalOcclusion>();
+            using var pass = renderGraph.AddFullscreenRenderPass("Screen Space Terrain");
+            pass.PreventNewSubPass = true;
 
-        pass.ReadRtHandle<CameraDepth>();
+            pass.Initialize(material, viewPassData.viewSize, viewPassData.viewCount, isScreenPass: true);
+            pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
+            pass.WriteRtHandle<GBufferAlbedoMetallic>();
+            pass.WriteRtHandle<GBufferNormalRoughness>();
+            pass.WriteRtHandle<GBufferBentNormalOcclusion>();
 
-        pass.ReadResource<TerrainFrameData>();
-        pass.ReadResource<TerrainViewData>();
-        pass.ReadResource<ViewData>();
+            pass.ReadRtHandle<CameraDepth>();
 
-        if (pass.TryReadResource<VirtualTextureData>())
-            pass.AddKeyword("VIRTUAL_TEXTURING_ON");
+            pass.ReadResource<TerrainFrameData>();
+            pass.ReadResource<TerrainViewData>();
+            pass.ReadResource<ViewData>();
+
+            if (pass.TryReadResource<VirtualTextureData>())
+                pass.AddKeyword("VIRTUAL_TEXTURING_ON");
+        }
     }
 }

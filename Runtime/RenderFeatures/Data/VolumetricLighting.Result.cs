@@ -1,29 +1,32 @@
 ﻿using UnityEngine;
 using UnityEngine.Rendering;
 
-public partial class VolumetricLighting
+namespace CustomRenderPipeline
 {
-	public readonly struct Result : IRenderPassData
+    public partial class VolumetricLighting
     {
-        private readonly ResourceHandle<RenderTexture> volumetricLighting;
-		private readonly ResourceHandle<GraphicsBuffer> volumetricLightingData;
-
-        public Result(ResourceHandle<RenderTexture> volumetricLighting, ResourceHandle<GraphicsBuffer> volumetricLightingData)
+        public readonly struct Result : IRenderPassData
         {
-            this.volumetricLighting = volumetricLighting;
-            this.volumetricLightingData = volumetricLightingData;
+            private readonly ResourceHandle<RenderTexture> volumetricLighting;
+            private readonly ResourceHandle<GraphicsBuffer> volumetricLightingData;
+
+            public Result(ResourceHandle<RenderTexture> volumetricLighting, ResourceHandle<GraphicsBuffer> volumetricLightingData)
+            {
+                this.volumetricLighting = volumetricLighting;
+                this.volumetricLightingData = volumetricLightingData;
+            }
+
+            public readonly void SetInputs(RenderPass pass)
+            {
+                pass.ReadTexture("VolumetricLighting", volumetricLighting);
+                pass.ReadBuffer("VolumetricLightingData", volumetricLightingData);
+            }
+
+            public readonly void SetProperties(RenderPass pass, CommandBuffer command)
+            {
+                pass.SetVector("VolumetricLightScale", pass.RenderGraph.GetScale3D(volumetricLighting));
+                pass.SetVector("VolumetricLightMax", pass.RenderGraph.GetLimit3D(volumetricLighting));
+            }
         }
-
-        public readonly void SetInputs(RenderPass pass)
-        {
-            pass.ReadTexture("VolumetricLighting", volumetricLighting);
-			pass.ReadBuffer("VolumetricLightingData", volumetricLightingData);
-        }
-
-        public readonly void SetProperties(RenderPass pass, CommandBuffer command)
-        {
-			pass.SetVector("VolumetricLightScale", pass.RenderGraph.GetScale3D(volumetricLighting));
-			pass.SetVector("VolumetricLightMax", pass.RenderGraph.GetLimit3D(volumetricLighting));
-		}
     }
 }

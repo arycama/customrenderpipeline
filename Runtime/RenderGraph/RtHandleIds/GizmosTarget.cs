@@ -1,21 +1,24 @@
 ﻿using UnityEngine;
 using UnityEngine.Rendering;
 
-public readonly struct GizmosTarget : IRenderPassData
+namespace CustomRenderPipeline
 {
-    private readonly ResourceHandle<RenderTexture> gizmosTarget;
-
-    public GizmosTarget(ResourceHandle<RenderTexture> gizmosTarget)
+    public readonly struct GizmosTarget : IRenderPassData
     {
-        this.gizmosTarget = gizmosTarget;
-    }
+        private readonly ResourceHandle<RenderTexture> gizmosTarget;
 
-    void IRenderPassData.SetInputs(RenderPass pass)
-    {
-        pass.ReadTexture("GizmosTarget", gizmosTarget);
-    }
+        public GizmosTarget(ResourceHandle<RenderTexture> gizmosTarget)
+        {
+            this.gizmosTarget = gizmosTarget;
+        }
 
-    void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
-    {
+        void IRenderPassData.SetInputs(RenderPass pass)
+        {
+            pass.ReadTexture("GizmosTarget", gizmosTarget);
+        }
+
+        void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
+        {
+        }
     }
 }

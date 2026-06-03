@@ -1,4 +1,5 @@
-#pragma once
+#ifndef VOLUMETRICS_INCLUDED
+#define VOLUMETRICS_INCLUDED
 
 #include "Math.hlsl"
 
@@ -49,7 +50,7 @@ float AlbedoFromScatterAbsorption(float scatter, float absorption)
 	return scatter / ExtinctionFromScatterAbsorption(scatter, absorption);
 }
 
-float ScatterFromAlbedoExtinction(float albedo, float extinction)
+float3 ScatterFromAlbedoExtinction(float3 albedo, float3 extinction)
 {
 	return albedo * extinction;
 }
@@ -68,3 +69,67 @@ float3 CombineAlbedo(float3 albedo0, float extinction0, float3 albedo1, float ex
 {
 	return (albedo0 * extinction0 + albedo1 * extinction1) / (extinction0 + extinction1);
 }
+
+float3 TransmittanceAtDistanceToExtinction(float3 transmittance, float distance)
+{
+	return -log(transmittance) / distance;
+}
+
+float PdfHeroWavelength(float3 rgbPdf, float3 channelProbability)
+{
+	return dot(rgbPdf, channelProbability);
+}
+
+float3 ImportanceSampleInfinitePdf(float t, float3 c)
+{
+	return c * exp(-c * t);
+}
+
+float3 ImportanceSampleInfinite(float xi, float3 c)
+{
+	return -log(1.0 - xi) / c;
+}
+
+float ImportanceSampleInfinite(float xi, float3 c, out float3 pdf)
+{
+	float t = ImportanceSampleInfinite(xi, c);
+	pdf = ImportanceSampleInfinitePdf(t, c);
+	return t;
+}
+
+float ImportanceSampleInfiniteHeroWavelength(float2 xi, float3 extinction, float3 channelProbability, out float3 weightOverPdf)
+{
+	float c = xi.x > channelProbability.x ? extinction.r : (xi.x > (channelProbability.x + channelProbability.y) ? extinction.g : extinction.b);
+	float3 pdf;
+	float t = ImportanceSampleInfinite(xi.y, c, pdf);
+	weightOverPdf = extinction * exp(-t * extinction) / PdfHeroWavelength(pdf, channelProbability);
+	return t;
+}
+
+float3 ImportanceSampleBoundedPdf(float t, float3 c, float b)
+{
+	return c * exp(c * (b - t)) / (exp(c * b) - 1.0);
+}
+
+float3 ImportanceSampleBounded(float xi, float3 c, float b)
+{
+	return -log(1.0 - xi * (1.0 - exp(-c * b))) / c;
+}
+
+float ImportanceSampleBounded(float xi, float3 c, float b, out float3 pdf)
+{
+	float t = ImportanceSampleBounded(xi, c, b);
+	pdf = ImportanceSampleBoundedPdf(t, c, b);
+	return t;
+}
+
+float ImportanceSampleBoundedHeroWavelength(float2 xi, float3 extinction, float b, float3 channelProbability, out float3 weightOverPdf)
+{
+	float c = xi.x > channelProbability.x ? extinction.r : (xi.x > (channelProbability.x + channelProbability.y) ? extinction.g : extinction.b);
+	float3 pdf;
+	float t = ImportanceSampleBounded(xi.y, c, b, pdf);
+	weightOverPdf = extinction * exp(-t * extinction) / PdfHeroWavelength(pdf, channelProbability);
+	return t;
+}
+
+#endif

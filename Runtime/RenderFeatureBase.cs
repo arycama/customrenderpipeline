@@ -1,40 +1,43 @@
 ﻿using System;
 using UnityEngine;
 
-/// <summary> Base class for render features</summary>
-public abstract class RenderFeatureBase : IDisposable
+namespace CustomRenderPipeline
 {
-	protected readonly RenderGraph renderGraph;
-	private bool disposedValue;
+    /// <summary> Base class for render features</summary>
+    public abstract class RenderFeatureBase : IDisposable
+    {
+        protected readonly RenderGraph renderGraph;
+        private bool disposedValue;
 
-	public RenderFeatureBase(RenderGraph renderGraph) 
-	{
-		this.renderGraph = renderGraph;
-	}
+        public RenderFeatureBase(RenderGraph renderGraph)
+        {
+            this.renderGraph = renderGraph;
+        }
 
-	~RenderFeatureBase()
-	{
-		Dispose(disposing: false);
-	}
+        ~RenderFeatureBase()
+        {
+            Dispose(disposing: false);
+        }
 
-	public void Dispose()
-	{
-		Dispose(disposing: true);
-		GC.SuppressFinalize(this);
-	}
+        public void Dispose()
+        {
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
 
-	protected void Dispose(bool disposing)
-	{
-		if (disposedValue)
-			return;
+        protected void Dispose(bool disposing)
+        {
+            if (disposedValue)
+                return;
 
-		if (!disposing)
-			Debug.LogError($"Render Feature [{GetType()}] not disposed correctly");
+            if (!disposing)
+                Debug.LogError($"Render Feature [{GetType()}] not disposed correctly");
 
-		Cleanup(disposing);
-		disposedValue = true;
-	}
+            Cleanup(disposing);
+            disposedValue = true;
+        }
 
-	/// <summary> Override in derived classes and put any cleanup code here (Eg free buffers, RT handles etc) </summary>
-	protected virtual void Cleanup(bool disposing) { }
+        /// <summary> Override in derived classes and put any cleanup code here (Eg free buffers, RT handles etc) </summary>
+        protected virtual void Cleanup(bool disposing) { }
+    }
 }

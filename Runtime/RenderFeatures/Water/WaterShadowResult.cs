@@ -2,34 +2,37 @@
 using UnityEngine.Rendering;
 using Unmath;
 
-public readonly struct WaterShadowResult : IRenderPassData
+namespace CustomRenderPipeline
 {
-    private readonly ResourceHandle<RenderTexture> waterShadowTexture, waterIlluminance;
-    private readonly Float4x4 waterShadowMatrix;
-    private readonly float waterShadowNear, waterShadowFar;
-    private readonly Float3 waterShadowExtinction;
-
-    public WaterShadowResult(ResourceHandle<RenderTexture> waterShadowTexture, Float4x4 waterShadowMatrix, float waterShadowNear, float waterShadowFar, Float3 waterShadowExtinction, ResourceHandle<RenderTexture> waterIlluminance)
+    public readonly struct WaterShadowResult : IRenderPassData
     {
-        this.waterShadowTexture = waterShadowTexture;
-        this.waterShadowMatrix = waterShadowMatrix;
-        this.waterShadowNear = waterShadowNear;
-        this.waterShadowFar = waterShadowFar;
-        this.waterShadowExtinction = waterShadowExtinction;
-        this.waterIlluminance = waterIlluminance;
+        private readonly ResourceHandle<RenderTexture> waterShadowTexture, waterIlluminance;
+        private readonly Float4x4 waterShadowMatrix;
+        private readonly float waterShadowNear, waterShadowFar;
+        private readonly Float3 waterShadowExtinction;
+
+        public WaterShadowResult(ResourceHandle<RenderTexture> waterShadowTexture, Float4x4 waterShadowMatrix, float waterShadowNear, float waterShadowFar, Float3 waterShadowExtinction, ResourceHandle<RenderTexture> waterIlluminance)
+        {
+            this.waterShadowTexture = waterShadowTexture;
+            this.waterShadowMatrix = waterShadowMatrix;
+            this.waterShadowNear = waterShadowNear;
+            this.waterShadowFar = waterShadowFar;
+            this.waterShadowExtinction = waterShadowExtinction;
+            this.waterIlluminance = waterIlluminance;
+        }
+
+        void IRenderPassData.SetInputs(RenderPass pass)
+        {
+            pass.ReadTexture("_WaterShadows", waterShadowTexture);
+            pass.ReadTexture("WaterIlluminance", waterIlluminance);
+        }
+
+        void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
+        {
+            pass.SetMatrix("_WaterShadowMatrix1", waterShadowMatrix);
+            pass.SetFloat("_WaterShadowNear", waterShadowNear);
+            pass.SetFloat("_WaterShadowFar", waterShadowFar);
+            pass.SetVector("_WaterShadowExtinction", waterShadowExtinction);
+        }
     }
-
-	void IRenderPassData.SetInputs(RenderPass pass)
-	{
-		pass.ReadTexture("_WaterShadows", waterShadowTexture);
-		pass.ReadTexture("WaterIlluminance", waterIlluminance);
-	}
-
-	void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
-	{
-		pass.SetMatrix("_WaterShadowMatrix1", waterShadowMatrix);
-		pass.SetFloat("_WaterShadowNear", waterShadowNear);
-		pass.SetFloat("_WaterShadowFar", waterShadowFar);
-		pass.SetVector("_WaterShadowExtinction", waterShadowExtinction);
-	}
 }

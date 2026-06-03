@@ -1,7 +1,10 @@
 using UnityEngine.Rendering;
 
-public interface IRenderPassData
+namespace CustomRenderPipeline
 {
-	public void SetInputs(RenderPass pass);
-	public void SetProperties(RenderPass pass, CommandBuffer command);
+    public interface IRenderPassData
+    {
+        public void SetInputs(RenderPass pass);
+        public void SetProperties(RenderPass pass, CommandBuffer command);
+    }
 }

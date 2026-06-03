@@ -3,119 +3,122 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public partial class TemporalAA : ViewRenderFeature
+namespace CustomRenderPipeline
 {
-	private readonly Settings settings;
-	private readonly PersistentRTHandleCache colorCache, weightCache;
-	private readonly Material material;
-
-	public TemporalAA(Settings settings, RenderGraph renderGraph) : base(renderGraph)
-	{
-		this.settings = settings;
-		material = new Material(Shader.Find("Hidden/Temporal AA")) { hideFlags = HideFlags.HideAndDontSave };
-		colorCache = new(GraphicsFormat.A2B10G10R10_UNormPack32, renderGraph, "Temporal AA Color", isScreenTexture: true);
-		weightCache = new(GraphicsFormat.R8_SNorm, renderGraph, "Temporal AA Weight", isScreenTexture: true);
-	}
-
-	protected override void Cleanup(bool disposing)
-	{
-		colorCache.Dispose();
-		weightCache.Dispose();
-	}
-
-	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+    public partial class TemporalAA : ViewRenderFeature
     {
-		if (!settings.IsEnabled)
-			return;
+        private readonly Settings settings;
+        private readonly PersistentRTHandleCache colorCache, weightCache;
+        private readonly Material material;
 
-		bool wasCreated = default;
-		ResourceHandle<RenderTexture> current, history = default;
+        public TemporalAA(Settings settings, RenderGraph renderGraph) : base(renderGraph)
+        {
+            this.settings = settings;
+            material = new Material(Shader.Find("Hidden/Temporal AA")) { hideFlags = HideFlags.HideAndDontSave };
+            colorCache = new(GraphicsFormat.A2B10G10R10_UNormPack32, renderGraph, "Temporal AA Color", isScreenTexture: true);
+            weightCache = new(GraphicsFormat.R8_SNorm, renderGraph, "Temporal AA Weight", isScreenTexture: true);
+        }
 
-		var result = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
-		using var pass = renderGraph.AddFullscreenRenderPass("Temporal AA", new TemporalAADataStruct
-		(
-			settings.SpatialBlur,
-			settings.SpatialSharpness,
-			settings.SpatialSize,
-			settings.MotionSharpness * 0.8f,
-			wasCreated ? 0.0f : 1.0f,
-			settings.StationaryBlending,
-			settings.MotionBlending,
-			settings.MotionWeight,
-			scale: 1,
-			history,
-			settings.AfterImage
-		));
+        protected override void Cleanup(bool disposing)
+        {
+            colorCache.Dispose();
+            weightCache.Dispose();
+        }
 
-		//var keyword = null;// viewData.Scale < 1.0f ? "UPSCALE" : null; // TODO: Implement
-		pass.Initialize(material, viewPassData.viewSize, viewPassData.viewCount, 0, 1, isScreenPass: true);
-        pass.PreventNewSubPass = true;
+        public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+        {
+            if (!settings.IsEnabled)
+                return;
 
-		(current, history, wasCreated) = colorCache.GetTextures(viewPassData.viewSize, pass.Index, viewPassData.viewId);
-		var (currentWeight, historyWeight, wasCreated1) = weightCache.GetTextures(viewPassData.viewSize, pass.Index, viewPassData.viewId);
+            bool wasCreated = default;
+            ResourceHandle<RenderTexture> current, history = default;
 
-		pass.renderData.history = history;
-		pass.renderData.hasHistory = wasCreated ? 0f : 1f;
+            var result = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
+            using var pass = renderGraph.AddFullscreenRenderPass("Temporal AA", new TemporalAADataStruct
+            (
+                settings.SpatialBlur,
+                settings.SpatialSharpness,
+                settings.SpatialSize,
+                settings.MotionSharpness * 0.8f,
+                wasCreated ? 0.0f : 1.0f,
+                settings.StationaryBlending,
+                settings.MotionBlending,
+                settings.MotionWeight,
+                scale: 1,
+                history,
+                settings.AfterImage
+            ));
 
-		pass.ReadTexture("History", history);
-		pass.ReadTexture("HistoryWeight", historyWeight);
-		pass.WriteTexture(result);
-		pass.WriteTexture(current);
-		pass.WriteTexture(currentWeight);
-		pass.ReadResource<TemporalAAData>();
-		pass.ReadRtHandle<CameraTarget>();
-		pass.ReadRtHandle<CameraStencil>();
-		pass.ReadRtHandle<CameraDepth>();
-		pass.ReadRtHandle<CameraVelocity>();
-		pass.ReadResource<AutoExposureData>();
+            //var keyword = null;// viewData.Scale < 1.0f ? "UPSCALE" : null; // TODO: Implement
+            pass.Initialize(material, viewPassData.viewSize, viewPassData.viewCount, 0, 1, isScreenPass: true);
+            pass.PreventNewSubPass = true;
 
-		pass.SetRenderFunction(static (command, pass, data) =>
-		{
-			pass.SetFloat("_SpatialBlur", data.spatialSharpness);
-			pass.SetFloat("_SpatialSharpness", data.spatialSharpness);
-			pass.SetFloat("_SpatialSize", data.spatialSize);
-			pass.SetFloat("_MotionSharpness", data.motionSharpness);
-			pass.SetFloat("_HasHistory", data.hasHistory);
-			pass.SetFloat("_StationaryBlending", data.stationaryBlending);
-			pass.SetFloat("_VelocityBlending", data.motionBlending);
-			pass.SetFloat("_VelocityWeight", data.motionWeight);
-			pass.SetFloat("_Scale", data.scale);
-			pass.SetFloat("AfterImage", data.afterImage);
+            (current, history, wasCreated) = colorCache.GetTextures(viewPassData.viewSize, pass.Index, viewPassData.viewId);
+            var (currentWeight, historyWeight, wasCreated1) = weightCache.GetTextures(viewPassData.viewSize, pass.Index, viewPassData.viewId);
 
-			pass.SetVector("HistoryScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.history));
-			pass.SetVector("WeightHistoryScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.history));
-		});
+            pass.renderData.history = history;
+            pass.renderData.hasHistory = wasCreated ? 0f : 1f;
 
-		renderGraph.SetRTHandle<CameraTarget>(result);
-	}
-}
+            pass.ReadTexture("History", history);
+            pass.ReadTexture("HistoryWeight", historyWeight);
+            pass.WriteTexture(result);
+            pass.WriteTexture(current);
+            pass.WriteTexture(currentWeight);
+            pass.ReadResource<TemporalAAData>();
+            pass.ReadRtHandle<CameraTarget>();
+            pass.ReadRtHandle<CameraStencil>();
+            pass.ReadRtHandle<CameraDepth>();
+            pass.ReadRtHandle<CameraVelocity>();
+            pass.ReadResource<AutoExposureData>();
 
-internal struct TemporalAADataStruct
-{
-	public float spatialBlur;
-	public float spatialSharpness;
-	public float spatialSize;
-	public float motionSharpness;
-	public float hasHistory;
-	public float stationaryBlending;
-	public float motionBlending;
-	public float motionWeight;
-	public float afterImage;
-	public int scale;
-	public ResourceHandle<RenderTexture> history;
+            pass.SetRenderFunction(static (command, pass, data) =>
+            {
+                pass.SetFloat("_SpatialBlur", data.spatialSharpness);
+                pass.SetFloat("_SpatialSharpness", data.spatialSharpness);
+                pass.SetFloat("_SpatialSize", data.spatialSize);
+                pass.SetFloat("_MotionSharpness", data.motionSharpness);
+                pass.SetFloat("_HasHistory", data.hasHistory);
+                pass.SetFloat("_StationaryBlending", data.stationaryBlending);
+                pass.SetFloat("_VelocityBlending", data.motionBlending);
+                pass.SetFloat("_VelocityWeight", data.motionWeight);
+                pass.SetFloat("_Scale", data.scale);
+                pass.SetFloat("AfterImage", data.afterImage);
 
-	public TemporalAADataStruct(float spatialBlur, float spatialSharpness, float spatialSize, float motionSharpness, float hasHistory, float stationaryBlending, float motionBlending, float motionWeight, int scale, ResourceHandle<RenderTexture> history, float afterImage)
-	{
-		this.spatialBlur = spatialBlur;
-		this.spatialSharpness = spatialSharpness;
-		this.spatialSize = spatialSize;
-		this.motionSharpness = motionSharpness;
-		this.hasHistory = hasHistory;
-		this.stationaryBlending = stationaryBlending;
-		this.motionBlending = motionBlending;
-		this.motionWeight = motionWeight;
-		this.scale = scale;
-		this.history = history;
-		this.afterImage = afterImage;
-	}
+                pass.SetVector("HistoryScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.history));
+                pass.SetVector("WeightHistoryScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.history));
+            });
+
+            renderGraph.SetRTHandle<CameraTarget>(result);
+        }
+    }
+
+    internal struct TemporalAADataStruct
+    {
+        public float spatialBlur;
+        public float spatialSharpness;
+        public float spatialSize;
+        public float motionSharpness;
+        public float hasHistory;
+        public float stationaryBlending;
+        public float motionBlending;
+        public float motionWeight;
+        public float afterImage;
+        public int scale;
+        public ResourceHandle<RenderTexture> history;
+
+        public TemporalAADataStruct(float spatialBlur, float spatialSharpness, float spatialSize, float motionSharpness, float hasHistory, float stationaryBlending, float motionBlending, float motionWeight, int scale, ResourceHandle<RenderTexture> history, float afterImage)
+        {
+            this.spatialBlur = spatialBlur;
+            this.spatialSharpness = spatialSharpness;
+            this.spatialSize = spatialSize;
+            this.motionSharpness = motionSharpness;
+            this.hasHistory = hasHistory;
+            this.stationaryBlending = stationaryBlending;
+            this.motionBlending = motionBlending;
+            this.motionWeight = motionWeight;
+            this.scale = scale;
+            this.history = history;
+            this.afterImage = afterImage;
+        }
+    }
 }

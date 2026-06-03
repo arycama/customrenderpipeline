@@ -5,131 +5,134 @@ using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using static Unmath.Math;
 
-public class EnvironmentConvolve : ViewRenderFeature
+namespace CustomRenderPipeline
 {
-    private readonly Material convolveMaterial;
-    private readonly EnvironmentLightingSettings settings;
-    private readonly Dictionary<int, (ResourceHandle<RenderTexture> reflection, ResourceHandle<GraphicsBuffer> ambient)> viewBuffers = new();
-
-    private readonly Dictionary<int, (int requested, int current)> viewIndexGenerationCounter = new();
-
-    public EnvironmentConvolve(RenderGraph renderGraph, EnvironmentLightingSettings settings) : base(renderGraph)
+    public class EnvironmentConvolve : ViewRenderFeature
     {
-        convolveMaterial = new Material(Shader.Find("Hidden/GgxConvolve")) { hideFlags = HideFlags.HideAndDontSave };
-        this.settings = settings;
-    }
+        private readonly Material convolveMaterial;
+        private readonly EnvironmentLightingSettings settings;
+        private readonly Dictionary<int, (ResourceHandle<RenderTexture> reflection, ResourceHandle<GraphicsBuffer> ambient)> viewBuffers = new();
 
-    public void UpdateView(int viewId)
-    {
-        if (!viewIndexGenerationCounter.TryGetValue(viewId, out var generation))
-            viewIndexGenerationCounter.Add(viewId, (0, -1));
-        else
-            viewIndexGenerationCounter[viewId] = (generation.requested + 1, generation.current);
-    }
+        private readonly Dictionary<int, (int requested, int current)> viewIndexGenerationCounter = new();
 
-    protected override void Cleanup(bool disposing)
-    {
-        foreach (var (reflection, ambient) in viewBuffers.Values)
+        public EnvironmentConvolve(RenderGraph renderGraph, EnvironmentLightingSettings settings) : base(renderGraph)
         {
-            renderGraph.ReleasePersistentResource(reflection, -1);
-            renderGraph.ReleasePersistentResource(ambient, -1);
-        }
-    }
-
-    public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
-    {
-        ResourceHandle<RenderTexture> reflection;
-        ResourceHandle<GraphicsBuffer> ambient;
-        var wasCreated = !viewBuffers.TryGetValue(viewPassData.viewId, out var viewBuffer);
-        if (wasCreated)
-        {
-            reflection = renderGraph.GetTexture(settings.Resolution, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true, isExactSize: true, isPersistent: true);
-            ambient = renderGraph.GetBuffer(7, sizeof(float) * 4, GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination, GraphicsBuffer.UsageFlags.None, true);
-            viewBuffers[viewPassData.viewId] = (reflection, ambient);
-        }
-        else
-        {
-            reflection = viewBuffer.reflection;
-            ambient = viewBuffer.ambient;
+            convolveMaterial = new Material(Shader.Find("Hidden/GgxConvolve")) { hideFlags = HideFlags.HideAndDontSave };
+            this.settings = settings;
         }
 
-        if (viewIndexGenerationCounter.TryGetValue(viewPassData.viewId, out var viewIndexGeneration) && viewIndexGeneration.requested > viewIndexGeneration.current)
+        public void UpdateView(int viewId)
         {
-            viewIndexGenerationCounter[viewPassData.viewId] = (viewIndexGeneration.requested, viewIndexGeneration.requested);
+            if (!viewIndexGenerationCounter.TryGetValue(viewId, out var generation))
+                viewIndexGenerationCounter.Add(viewId, (0, -1));
+            else
+                viewIndexGenerationCounter[viewId] = (generation.requested + 1, generation.current);
+        }
 
-            var reflectionProbeTemp = renderGraph.GetResource<EnvironmentProbeTempResult>();
-            using var scope = renderGraph.AddProfileScope("Environment Probe Convolve");
-
-            var ambientComputeShader = Resources.Load<ComputeShader>("AmbientProbe");
-            var ambientBufferTemp = renderGraph.GetBuffer(7, sizeof(float) * 4, GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource);
-            using (var pass = renderGraph.AddComputeRenderPass("Ambient Convolve", settings.Resolution))
+        protected override void Cleanup(bool disposing)
+        {
+            foreach (var (reflection, ambient) in viewBuffers.Values)
             {
-                pass.Initialize(ambientComputeShader, normalizedDispatch: false);
-                pass.WriteBuffer("_AmbientProbeOutputBuffer", ambientBufferTemp);
-                pass.ReadResource<EnvironmentProbeTempResult>();
+                renderGraph.ReleasePersistentResource(reflection, -1);
+                renderGraph.ReleasePersistentResource(ambient, -1);
+            }
+        }
 
-                pass.SetRenderFunction(static (command, pass, reflectionResolution) =>
-                {
-                    // Prefiltered importance sampling, use lower MIP-map levels for fetching samples with low probabilities in order to reduce the variance.
-                    // Ref: http://http.developer.nvidia.com/GPUGems3/gpugems3_ch20.html
-                    // Must match compute shader
-                    var sampleCount = 512;
-
-                    // Solid angle associated with the texel of the cubemap
-                    var omegaP = FourPi / (6.0f * reflectionResolution * reflectionResolution);
-
-                    // Solid angle associated with the sample
-                    var pdf = Rcp(FourPi);
-                    var omegaS = Rcp(sampleCount * pdf);
-
-                    var mipLevel = 0.5f * Log2(omegaS / omegaP);
-                    pass.SetFloat("_MipLevel", mipLevel);
-                });
+        public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+        {
+            ResourceHandle<RenderTexture> reflection;
+            ResourceHandle<GraphicsBuffer> ambient;
+            var wasCreated = !viewBuffers.TryGetValue(viewPassData.viewId, out var viewBuffer);
+            if (wasCreated)
+            {
+                reflection = renderGraph.GetTexture(settings.Resolution, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true, isExactSize: true, isPersistent: true);
+                ambient = renderGraph.GetBuffer(7, sizeof(float) * 4, GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination, GraphicsBuffer.UsageFlags.None, true);
+                viewBuffers[viewPassData.viewId] = (reflection, ambient);
+            }
+            else
+            {
+                reflection = viewBuffer.reflection;
+                ambient = viewBuffer.ambient;
             }
 
-            using (var pass = renderGraph.AddGenericRenderPass("Ambient Buffer Copy", (reflectionProbeTemp.TempProbe, ambientBufferTemp, reflection, ambient)))
+            if (viewIndexGenerationCounter.TryGetValue(viewPassData.viewId, out var viewIndexGeneration) && viewIndexGeneration.requested > viewIndexGeneration.current)
             {
-                pass.WriteTexture(reflection);
-                pass.WriteBuffer("", ambient);
-                pass.ReadBuffer("", ambientBufferTemp);
-                pass.ReadResource<EnvironmentProbeTempResult>();
+                viewIndexGenerationCounter[viewPassData.viewId] = (viewIndexGeneration.requested, viewIndexGeneration.requested);
 
-                pass.SetRenderFunction(static (command, pass, data) =>
+                var reflectionProbeTemp = renderGraph.GetResource<EnvironmentProbeTempResult>();
+                using var scope = renderGraph.AddProfileScope("Environment Probe Convolve");
+
+                var ambientComputeShader = Resources.Load<ComputeShader>("AmbientProbe");
+                var ambientBufferTemp = renderGraph.GetBuffer(7, sizeof(float) * 4, GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource);
+                using (var pass = renderGraph.AddComputeRenderPass("Ambient Convolve", settings.Resolution))
                 {
-                    command.CopyBuffer(pass.GetBuffer(data.ambientBufferTemp), pass.GetBuffer(data.ambient));
-                    command.CopyTexture(pass.GetRenderTexture(data.TempProbe), 0, 0, pass.GetRenderTexture(data.reflection), 0, 0);
-                });
-            }
+                    pass.Initialize(ambientComputeShader, normalizedDispatch: false);
+                    pass.WriteBuffer("_AmbientProbeOutputBuffer", ambientBufferTemp);
+                    pass.ReadResource<EnvironmentProbeTempResult>();
 
-            const int mipLevels = 6;
-            for (var i = 1; i < 7; i++)
-            {
-                using (var pass = renderGraph.AddFullscreenRenderPass("Ggx Convolve", (i, envResolution: settings.Resolution, settings.Samples)))
+                    pass.SetRenderFunction(static (command, pass, reflectionResolution) =>
+                    {
+                        // Prefiltered importance sampling, use lower MIP-map levels for fetching samples with low probabilities in order to reduce the variance.
+                        // Ref: http://http.developer.nvidia.com/GPUGems3/gpugems3_ch20.html
+                        // Must match compute shader
+                        var sampleCount = 512;
+
+                        // Solid angle associated with the texel of the cubemap
+                        var omegaP = FourPi / (6.0f * reflectionResolution * reflectionResolution);
+
+                        // Solid angle associated with the sample
+                        var pdf = Rcp(FourPi);
+                        var omegaS = Rcp(sampleCount * pdf);
+
+                        var mipLevel = 0.5f * Log2(omegaS / omegaP);
+                        pass.SetFloat("_MipLevel", mipLevel);
+                    });
+                }
+
+                using (var pass = renderGraph.AddGenericRenderPass("Ambient Buffer Copy", (reflectionProbeTemp.TempProbe, ambientBufferTemp, reflection, ambient)))
                 {
-                    pass.Initialize(convolveMaterial, settings.Resolution);
-                    pass.MipLevel = i;
-
                     pass.WriteTexture(reflection);
+                    pass.WriteBuffer("", ambient);
+                    pass.ReadBuffer("", ambientBufferTemp);
                     pass.ReadResource<EnvironmentProbeTempResult>();
 
                     pass.SetRenderFunction(static (command, pass, data) =>
                     {
-                        var perceptualRoughness = Saturate(data.i / (float)mipLevels);
-                        var mipPerceptualRoughness = Saturate(1.7f / 1.4f - Sqrt(2.89f / 1.96f - 2.8f / 1.96f * perceptualRoughness));
-                        var mipRoughness = mipPerceptualRoughness * mipPerceptualRoughness;
-
-                        pass.SetInt("Samples", data.Samples);
-                        pass.SetFloat("RcpSamples", Rcp(data.Samples));
-                        pass.SetFloat("Level", data.i);
-                        pass.SetFloat("RcpOmegaP", data.envResolution * data.envResolution / (4.0f * Pi * data.Samples));
-                        pass.SetFloat("PerceptualRoughness", mipPerceptualRoughness);
-                        pass.SetFloat("Roughness", mipRoughness);
-                        pass.SetFloat("Resolution", data.envResolution);
+                        command.CopyBuffer(pass.GetBuffer(data.ambientBufferTemp), pass.GetBuffer(data.ambient));
+                        command.CopyTexture(pass.GetRenderTexture(data.TempProbe), 0, 0, pass.GetRenderTexture(data.reflection), 0, 0);
                     });
                 }
-            }
-        }
 
-        renderGraph.SetResource(new EnvironmentData(reflection, ambient, settings.Resolution), true);
+                const int mipLevels = 6;
+                for (var i = 1; i < 7; i++)
+                {
+                    using (var pass = renderGraph.AddFullscreenRenderPass("Ggx Convolve", (i, envResolution: settings.Resolution, settings.Samples)))
+                    {
+                        pass.Initialize(convolveMaterial, settings.Resolution);
+                        pass.MipLevel = i;
+
+                        pass.WriteTexture(reflection);
+                        pass.ReadResource<EnvironmentProbeTempResult>();
+
+                        pass.SetRenderFunction(static (command, pass, data) =>
+                        {
+                            var perceptualRoughness = Saturate(data.i / (float)mipLevels);
+                            var mipPerceptualRoughness = Saturate(1.7f / 1.4f - Sqrt(2.89f / 1.96f - 2.8f / 1.96f * perceptualRoughness));
+                            var mipRoughness = mipPerceptualRoughness * mipPerceptualRoughness;
+
+                            pass.SetInt("Samples", data.Samples);
+                            pass.SetFloat("RcpSamples", Rcp(data.Samples));
+                            pass.SetFloat("Level", data.i);
+                            pass.SetFloat("RcpOmegaP", data.envResolution * data.envResolution / (4.0f * Pi * data.Samples));
+                            pass.SetFloat("PerceptualRoughness", mipPerceptualRoughness);
+                            pass.SetFloat("Roughness", mipRoughness);
+                            pass.SetFloat("Resolution", data.envResolution);
+                        });
+                    }
+                }
+            }
+
+            renderGraph.SetResource(new EnvironmentData(reflection, ambient, settings.Resolution), true);
+        }
     }
 }

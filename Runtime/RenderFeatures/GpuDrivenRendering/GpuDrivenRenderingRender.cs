@@ -2,66 +2,69 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 
-public class GpuDrivenRenderingRender : ViewRenderFeature
+namespace CustomRenderPipeline
 {
-	private GpuDrivenRenderer gpuDrivenRenderer;
-
-	public GpuDrivenRenderingRender(GpuDrivenRenderer gpuDrivenRenderer, RenderGraph renderGraph) : base(renderGraph)
-	{
-		this.gpuDrivenRenderer = gpuDrivenRenderer;
-	}
-
-	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+    public class GpuDrivenRenderingRender : ViewRenderFeature
     {
-		if (viewPassData.cameraType != CameraType.SceneView && viewPassData.cameraType != CameraType.Game && viewPassData.cameraType != CameraType.Reflection)
-			return;
+        private GpuDrivenRenderer gpuDrivenRenderer;
 
-		if (!renderGraph.ResourceMap.TryGetResource<GpuDrivenRenderingData>(renderGraph.FrameIndex, out var instanceData))
-			return;
+        public GpuDrivenRenderingRender(GpuDrivenRenderer gpuDrivenRenderer, RenderGraph renderGraph) : base(renderGraph)
+        {
+            this.gpuDrivenRenderer = gpuDrivenRenderer;
+        }
 
-		if (!instanceData.rendererDrawCallData.TryGetValue("MotionVectors", out var drawList))
-			return;
+        public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+        {
+            if (viewPassData.cameraType != CameraType.SceneView && viewPassData.cameraType != CameraType.Game && viewPassData.cameraType != CameraType.Reflection)
+                return;
 
-		using var scope = renderGraph.AddProfileScope("Gpu Driven Rendering");
+            if (!renderGraph.ResourceMap.TryGetResource<GpuDrivenRenderingData>(renderGraph.FrameIndex, out var instanceData))
+                return;
 
-		var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().cullingPlanes;
-		var renderingData = gpuDrivenRenderer.Setup(viewPassData.viewSize, false, cullingPlanes, instanceData);
+            if (!instanceData.rendererDrawCallData.TryGetValue("MotionVectors", out var drawList))
+                return;
 
-		using var renderScope = renderGraph.AddProfileScope("Render");
+            using var scope = renderGraph.AddProfileScope("Gpu Driven Rendering");
 
-		for (var i = 0; i < drawList.Count; i++)
-		{
-			var draw = drawList[i];
-			using (var pass = renderGraph.AddDrawInstancedIndirectRenderPass("Gpu Driven Rendering", (draw.lodOffset, draw.objectToWorld)))
-			{
-				pass.Initialize(draw.mesh, draw.submeshIndex, draw.material, instanceData.drawCallArgs, viewPassData.viewSize, viewPassData.viewCount, draw.passIndex, 0.0f, 0.0f, true, draw.indirectArgsOffset, isScreenPass: true);
-				pass.AddKeyword("INDIRECT_RENDERING");
-				pass.UseProfiler = false;
+            var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().cullingPlanes;
+            var renderingData = gpuDrivenRenderer.Setup(viewPassData.viewSize, false, cullingPlanes, instanceData);
 
-				pass.WriteRtHandleDepth<CameraDepth>();
-				pass.WriteRtHandle<GBufferAlbedoMetallic>();
-				pass.WriteRtHandle<GBufferNormalRoughness>();
-				pass.WriteRtHandle<GBufferBentNormalOcclusion>();
-				pass.WriteRtHandle<CameraTarget>();
-				pass.WriteRtHandle<CameraVelocity>();
-				pass.ReadResource<AutoExposureData>();
-				pass.ReadResource<TemporalAAData>();
-				pass.ReadResource<AtmospherePropertiesAndTables>();
-				pass.ReadResource<ViewData>();
-				pass.ReadResource<FrameData>();
+            using var renderScope = renderGraph.AddProfileScope("Render");
 
-				pass.ReadBuffer("_VisibleRendererInstanceIndices", renderingData.visibilityPredicates);
-				pass.ReadBuffer("_ObjectToWorld", renderingData.objectToWorld);
-				pass.ReadBuffer("_InstancePositions", instanceData.positions);
-				pass.ReadBuffer("_InstanceLodFades", instanceData.lodFades);
-				pass.ReadBuffer("InstanceIdOffsets", renderingData.instanceIdOffsetsBuffer);
+            for (var i = 0; i < drawList.Count; i++)
+            {
+                var draw = drawList[i];
+                using (var pass = renderGraph.AddDrawInstancedIndirectRenderPass("Gpu Driven Rendering", (draw.lodOffset, draw.objectToWorld)))
+                {
+                    pass.Initialize(draw.mesh, draw.submeshIndex, draw.material, instanceData.drawCallArgs, viewPassData.viewSize, viewPassData.viewCount, draw.passIndex, 0.0f, 0.0f, true, draw.indirectArgsOffset, isScreenPass: true);
+                    pass.AddKeyword("INDIRECT_RENDERING");
+                    pass.UseProfiler = false;
 
-				pass.SetRenderFunction(static (command, pass, data) =>
-				{
-					pass.SetInt("InstanceIdOffsetsIndex", data.lodOffset);
-					pass.SetMatrix("LocalToWorld", (Matrix4x4)data.objectToWorld);
-				});
-			}
-		}
-	}
+                    pass.WriteRtHandleDepth<CameraDepth>();
+                    pass.WriteRtHandle<GBufferAlbedoMetallic>();
+                    pass.WriteRtHandle<GBufferNormalRoughness>();
+                    pass.WriteRtHandle<GBufferBentNormalOcclusion>();
+                    pass.WriteRtHandle<CameraTarget>();
+                    pass.WriteRtHandle<CameraVelocity>();
+                    pass.ReadResource<AutoExposureData>();
+                    pass.ReadResource<TemporalAAData>();
+                    pass.ReadResource<AtmospherePropertiesAndTables>();
+                    pass.ReadResource<ViewData>();
+                    pass.ReadResource<FrameData>();
+
+                    pass.ReadBuffer("_VisibleRendererInstanceIndices", renderingData.visibilityPredicates);
+                    pass.ReadBuffer("_ObjectToWorld", renderingData.objectToWorld);
+                    pass.ReadBuffer("_InstancePositions", instanceData.positions);
+                    pass.ReadBuffer("_InstanceLodFades", instanceData.lodFades);
+                    pass.ReadBuffer("InstanceIdOffsets", renderingData.instanceIdOffsetsBuffer);
+
+                    pass.SetRenderFunction(static (command, pass, data) =>
+                    {
+                        pass.SetInt("InstanceIdOffsetsIndex", data.lodOffset);
+                        pass.SetMatrix("LocalToWorld", (Matrix4x4)data.objectToWorld);
+                    });
+                }
+            }
+        }
+    }
 }

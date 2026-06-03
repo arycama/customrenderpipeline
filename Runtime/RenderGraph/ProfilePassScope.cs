@@ -1,34 +1,37 @@
 ﻿using System;
 
-public readonly struct ProfilePassScope : IDisposable
+namespace CustomRenderPipeline
 {
-	private readonly string name;
-	private readonly RenderGraph renderGraph;
+    public readonly struct ProfilePassScope : IDisposable
+    {
+        private readonly string name;
+        private readonly RenderGraph renderGraph;
 
-	public ProfilePassScope(string name, RenderGraph renderGraph)
-	{
-        // TODO: There might be a more concise way to do this
-        var pass = renderGraph.AddGenericRenderPass(name);
-        pass.UseProfiler = false;
-
-        pass.SetRenderFunction(static (command, pass, name) =>
+        public ProfilePassScope(string name, RenderGraph renderGraph)
         {
-            command.BeginSample(pass.Name);
-        });
+            // TODO: There might be a more concise way to do this
+            var pass = renderGraph.AddGenericRenderPass(name);
+            pass.UseProfiler = false;
 
-        this.name = name;
-		this.renderGraph = renderGraph;
-	}
+            pass.SetRenderFunction(static (command, pass, name) =>
+            {
+                command.BeginSample(pass.Name);
+            });
 
-	readonly void IDisposable.Dispose()
-	{
-        // TODO: There might be a more concise way to do this
-        var pass = renderGraph.AddGenericRenderPass(name);
-        pass.UseProfiler = false;
+            this.name = name;
+            this.renderGraph = renderGraph;
+        }
 
-        pass.SetRenderFunction(static (command, pass, name) =>
+        readonly void IDisposable.Dispose()
         {
-            command.EndSample(pass.Name);
-        });
+            // TODO: There might be a more concise way to do this
+            var pass = renderGraph.AddGenericRenderPass(name);
+            pass.UseProfiler = false;
+
+            pass.SetRenderFunction(static (command, pass, name) =>
+            {
+                command.EndSample(pass.Name);
+            });
+        }
     }
 }

@@ -9,197 +9,200 @@ using Unmath;
 using static Unmath.Math;
 using Object = UnityEngine.Object;
 
-public class ParticleShadows : ViewRenderFeature
+namespace CustomRenderPipeline
 {
-	[Serializable]
-	public class Settings
-	{
-		[field: SerializeField] public int DirectionalResolution { get; private set; } = 256;
-		[field: SerializeField] public int DirectionalDepth { get; private set; } = 64;
-	}
-
-	private static IndexedString directionalCascadeIds = new("Directional Cascade "),
-		pointLightIds = new("Point Light "),
-		SpotLightIds = new("Spot Light ");
-
-	private readonly Settings settings;
-	//private readonly Material material;
-	private readonly ComputeShader accumulateShader;
-
-	private readonly List<Camera> cameras = new();
-
-	public ParticleShadows(RenderGraph renderGraph, Settings settings) : base(renderGraph)
-	{
-		this.settings = settings;
-		//material = new Material(Shader.Find("")) { hideFlags = HideFlags.HideAndDontSave };
-		accumulateShader = Resources.Load<ComputeShader>("Lighting/ParticleShadowAccumulate");
-	}
-
-	protected override void Cleanup(bool disposing)
-	{
-		foreach (var camera in cameras)
-			Object.DestroyImmediate(camera.gameObject);
-
-		cameras.Clear();
-	}
-
-	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+    public class ParticleShadows : ViewRenderFeature
     {
-		using var renderShadowsScope = renderGraph.AddProfileScope("Particle Shadows");
+        [Serializable]
+        public class Settings
+        {
+            [field: SerializeField] public int DirectionalResolution { get; private set; } = 256;
+            [field: SerializeField] public int DirectionalDepth { get; private set; } = 64;
+        }
 
-		// TODO: Allocate 1 big atlas
-		// TODO: Use renderer lists to avoid allocating/rendering empty cascades
-		var requestData = renderGraph.GetResource<ShadowRequestsData>();
-		var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
+        private static IndexedString directionalCascadeIds = new("Directional Cascade "),
+            pointLightIds = new("Point Light "),
+            SpotLightIds = new("Spot Light ");
 
-		// Allocate and clear shadow maps
-		var directionalShadowCount = Max(1, requestData.directionalShadowRequests.Count);
+        private readonly Settings settings;
+        //private readonly Material material;
+        private readonly ComputeShader accumulateShader;
 
-		// Since 3D texture arrays aren't a thing, allocate one wide texture
-		var directionalShadows = renderGraph.GetTexture(new(settings.DirectionalResolution * directionalShadowCount, settings.DirectionalResolution), GraphicsFormat.R8_UNorm, settings.DirectionalDepth, TextureDimension.Tex3D, isExactSize: true, clear: true, clearColor: Color.white);
+        private readonly List<Camera> cameras = new();
 
-        var viewPosition = viewPassData.position;
+        public ParticleShadows(RenderGraph renderGraph, Settings settings) : base(renderGraph)
+        {
+            this.settings = settings;
+            //material = new Material(Shader.Find("")) { hideFlags = HideFlags.HideAndDontSave };
+            accumulateShader = Resources.Load<ComputeShader>("Lighting/ParticleShadowAccumulate");
+        }
 
-        void RenderShadowMap(in ShadowRequest request, ResourceHandle<RenderTexture> target, int index, bool flipY, bool zClip, bool isPointLight, ScriptableRenderContext context)
-		{
-            var perCascadeData = renderGraph.SetConstantBuffer((request.ViewMatrix, request.ProjectionMatrix.Mul(request.ViewMatrix), request.ProjectionMatrix, viewPosition, 0, request.LightPosition, 0));
+        protected override void Cleanup(bool disposing)
+        {
+            foreach (var camera in cameras)
+                Object.DestroyImmediate(camera.gameObject);
 
-			while (cameras.Count <= index)
-			{
-				// Each probe gets it's own camera. This seems to be neccessary for now
-				// TODO: Try removing this after we convert the logic to use matrices instead of transforms, and see if we can just use one camera. 
-				var cameraGameObject = new GameObject("Particle Shadow Camera")
-				{
-					hideFlags = HideFlags.HideAndDontSave
-				};
+            cameras.Clear();
+        }
 
-				var particleShadowCamera = cameraGameObject.AddComponent<Camera>();
-				particleShadowCamera.enabled = false;
-				particleShadowCamera.orthographic = true;
-				cameras.Add(particleShadowCamera);
-			}
+        public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+        {
+            using var renderShadowsScope = renderGraph.AddProfileScope("Particle Shadows");
 
-			var particleCamera = cameras[index];
-			particleCamera.transform.SetPositionAndRotation(request.ViewPosition, request.ViewRotation);
-            particleCamera.nearClipPlane = request.Near;
-			particleCamera.farClipPlane = request.Far;
-			particleCamera.orthographicSize = request.Height * 0.5f;
-			particleCamera.aspect = request.Width / request.Height;
+            // TODO: Allocate 1 big atlas
+            // TODO: Use renderer lists to avoid allocating/rendering empty cascades
+            var requestData = renderGraph.GetResource<ShadowRequestsData>();
+            var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 
-			if (!particleCamera.TryGetCullingParameters(out var cullingPrameters))
-				return;
+            // Allocate and clear shadow maps
+            var directionalShadowCount = Max(1, requestData.directionalShadowRequests.Count);
 
-			var voxelSize = (request.Far - request.Near) / settings.DirectionalDepth;
-			using (var pass = renderGraph.AddObjectRenderPass("Particle Shadows", (target, index, settings.DirectionalResolution, settings.DirectionalDepth, zClip, voxelSize)))
-			{
-				cullingPrameters.cullingOptions = CullingOptions.ForceEvenIfCameraIsNotActive | CullingOptions.DisablePerObjectCulling;
-				var cullingResults = context.Cull(ref cullingPrameters);
-				pass.Initialize("ParticleShadow", context, cullingResults, RenderQueueRange.transparent, new Int2(settings.DirectionalResolution * directionalShadowCount, settings.DirectionalResolution), request.ViewPosition, request.ViewRotation, request.ViewRotation.Forward, DistanceMetric.Orthographic, SortingCriteria.CommonTransparent, viewCount: settings.DirectionalDepth);
+            // Since 3D texture arrays aren't a thing, allocate one wide texture
+            var directionalShadows = renderGraph.GetTexture(new(settings.DirectionalResolution * directionalShadowCount, settings.DirectionalResolution), GraphicsFormat.R8_UNorm, settings.DirectionalDepth, TextureDimension.Tex3D, isExactSize: true, clear: true, clearColor: Color.white);
 
-				// Doesn't actually do anything for this pass, except tells the rendergraph system that it gets written to
-				pass.WriteTexture(directionalShadows);
-				pass.ReadTexture("ParticleShadowWrite", target);
-				pass.ReadRtHandle<CameraDepth>();
-				pass.ReadResource<ViewData>(); 
+            var viewPosition = viewPassData.position;
 
-				pass.ReadBuffer("PerCascadeData", perCascadeData);
-
-				pass.SetRenderFunction(static (command, pass, data) =>
-				{
-					pass.SetFloat("ParticleShadowDepth", data.DirectionalDepth);
-					pass.SetFloat("ParticleShadowResolution", data.DirectionalResolution);
-					pass.SetFloat("ParticleShadowIndex", data.index);
-					pass.SetFloat("ParticleVoxelSize", data.voxelSize);
-					command.SetViewport(new Rect(data.index * data.DirectionalResolution, 0, data.DirectionalResolution, data.DirectionalResolution));
-				});
-			}
-		}
-
-		var directionalShadowSizes = ArrayPool<float>.Get(directionalShadowCount);
-		using (renderGraph.AddProfileScope($"Directional Shadows"))
-		{
-            if (requestData.directionalShadowRequests.Count == 0)
+            void RenderShadowMap(in ShadowRequest request, ResourceHandle<RenderTexture> target, int index, bool flipY, bool zClip, bool isPointLight, ScriptableRenderContext context)
             {
-                // Dummy pass
-                using (var pass = renderGraph.AddGenericRenderPass("Shadow Dummy Pass", directionalShadows))
-                {
-                    pass.WriteTexture(directionalShadows);
-                    //pass.WriteTexture(result);
-                    //pass.ReadTexture("", directionalShadows);
-                    //pass.ReadTexture("", result);
+                var perCascadeData = renderGraph.SetConstantBuffer((request.ViewMatrix, request.ProjectionMatrix.Mul(request.ViewMatrix), request.ProjectionMatrix, viewPosition, 0, request.LightPosition, 0));
 
-                    pass.SetRenderFunction(static (command, pass, directionalShadows) =>
+                while (cameras.Count <= index)
+                {
+                    // Each probe gets it's own camera. This seems to be neccessary for now
+                    // TODO: Try removing this after we convert the logic to use matrices instead of transforms, and see if we can just use one camera. 
+                    var cameraGameObject = new GameObject("Particle Shadow Camera")
                     {
-                        command.SetRenderTarget(pass.GetRenderTexture(directionalShadows), 0, CubemapFace.Unknown, -1);
-                        command.ClearRenderTarget(false, true, Color.white);
+                        hideFlags = HideFlags.HideAndDontSave
+                    };
+
+                    var particleShadowCamera = cameraGameObject.AddComponent<Camera>();
+                    particleShadowCamera.enabled = false;
+                    particleShadowCamera.orthographic = true;
+                    cameras.Add(particleShadowCamera);
+                }
+
+                var particleCamera = cameras[index];
+                particleCamera.transform.SetPositionAndRotation(request.ViewPosition, request.ViewRotation);
+                particleCamera.nearClipPlane = request.Near;
+                particleCamera.farClipPlane = request.Far;
+                particleCamera.orthographicSize = request.Height * 0.5f;
+                particleCamera.aspect = request.Width / request.Height;
+
+                if (!particleCamera.TryGetCullingParameters(out var cullingPrameters))
+                    return;
+
+                var voxelSize = (request.Far - request.Near) / settings.DirectionalDepth;
+                using (var pass = renderGraph.AddObjectRenderPass("Particle Shadows", (target, index, settings.DirectionalResolution, settings.DirectionalDepth, zClip, voxelSize)))
+                {
+                    cullingPrameters.cullingOptions = CullingOptions.ForceEvenIfCameraIsNotActive | CullingOptions.DisablePerObjectCulling;
+                    var cullingResults = context.Cull(ref cullingPrameters);
+                    pass.Initialize("ParticleShadow", context, cullingResults, RenderQueueRange.transparent, new Int2(settings.DirectionalResolution * directionalShadowCount, settings.DirectionalResolution), request.ViewPosition, request.ViewRotation, request.ViewRotation.Forward, DistanceMetric.Orthographic, SortingCriteria.CommonTransparent, viewCount: settings.DirectionalDepth);
+
+                    // Doesn't actually do anything for this pass, except tells the rendergraph system that it gets written to
+                    pass.WriteTexture(directionalShadows);
+                    pass.ReadTexture("ParticleShadowWrite", target);
+                    pass.ReadRtHandle<CameraDepth>();
+                    pass.ReadResource<ViewData>();
+
+                    pass.ReadBuffer("PerCascadeData", perCascadeData);
+
+                    pass.SetRenderFunction(static (command, pass, data) =>
+                    {
+                        pass.SetFloat("ParticleShadowDepth", data.DirectionalDepth);
+                        pass.SetFloat("ParticleShadowResolution", data.DirectionalResolution);
+                        pass.SetFloat("ParticleShadowIndex", data.index);
+                        pass.SetFloat("ParticleVoxelSize", data.voxelSize);
+                        command.SetViewport(new Rect(data.index * data.DirectionalResolution, 0, data.DirectionalResolution, data.DirectionalResolution));
                     });
                 }
             }
-            else
+
+            var directionalShadowSizes = ArrayPool<float>.Get(directionalShadowCount);
+            using (renderGraph.AddProfileScope($"Directional Shadows"))
             {
-                // TODO: This needs to use the actual count or it will access out of bounds
-                for (var i = 0; i < requestData.directionalShadowRequests.Count; i++)
+                if (requestData.directionalShadowRequests.Count == 0)
                 {
-                    using (renderGraph.AddProfileScope(directionalCascadeIds[i]))
+                    // Dummy pass
+                    using (var pass = renderGraph.AddGenericRenderPass("Shadow Dummy Pass", directionalShadows))
                     {
-                        var request = requestData.directionalShadowRequests[i];
-                        RenderShadowMap(request, directionalShadows, i, true, false, false, context);
-                        directionalShadowSizes[i] = (request.Far - request.Near) / settings.DirectionalDepth;
+                        pass.WriteTexture(directionalShadows);
+                        //pass.WriteTexture(result);
+                        //pass.ReadTexture("", directionalShadows);
+                        //pass.ReadTexture("", result);
+
+                        pass.SetRenderFunction(static (command, pass, directionalShadows) =>
+                        {
+                            command.SetRenderTarget(pass.GetRenderTexture(directionalShadows), 0, CubemapFace.Unknown, -1);
+                            command.ClearRenderTarget(false, true, Color.white);
+                        });
                     }
                 }
+                else
+                {
+                    // TODO: This needs to use the actual count or it will access out of bounds
+                    for (var i = 0; i < requestData.directionalShadowRequests.Count; i++)
+                    {
+                        using (renderGraph.AddProfileScope(directionalCascadeIds[i]))
+                        {
+                            var request = requestData.directionalShadowRequests[i];
+                            RenderShadowMap(request, directionalShadows, i, true, false, false, context);
+                            directionalShadowSizes[i] = (request.Far - request.Near) / settings.DirectionalDepth;
+                        }
+                    }
+                }
+
+                ListPool<ShadowRequest>.Release(requestData.directionalShadowRequests);
             }
 
-			ListPool<ShadowRequest>.Release(requestData.directionalShadowRequests);
-		}
+            // Accumulate directional shadows
+            var result = renderGraph.GetTexture(new(settings.DirectionalResolution * directionalShadowCount, settings.DirectionalResolution), GraphicsFormat.R8_UNorm, settings.DirectionalDepth, TextureDimension.Tex3D, isRandomWrite: true, isExactSize: true);
+            var shadowSteps = renderGraph.GetBuffer(directionalShadowCount);
 
-		// Accumulate directional shadows
-		var result = renderGraph.GetTexture(new(settings.DirectionalResolution * directionalShadowCount, settings.DirectionalResolution), GraphicsFormat.R8_UNorm, settings.DirectionalDepth, TextureDimension.Tex3D, isRandomWrite: true, isExactSize: true);
-		var shadowSteps = renderGraph.GetBuffer(directionalShadowCount);
+            using (var pass = renderGraph.AddComputeRenderPass("Particle Shadow Directional Accumulate", (settings.DirectionalDepth, settings.DirectionalResolution, shadowSteps, directionalShadowSizes)))
+            {
+                pass.Initialize(accumulateShader, 0, settings.DirectionalResolution * directionalShadowCount, settings.DirectionalResolution, 1);
+                pass.ReadBuffer("ParticleShadowStep", shadowSteps);
+                pass.WriteBuffer("ParticleShadowStep", shadowSteps);
+                pass.WriteTexture("ParticleShadowWrite", result);
+                pass.ReadTexture("ParticleExtinction", directionalShadows);
 
-        using (var pass = renderGraph.AddComputeRenderPass("Particle Shadow Directional Accumulate", (settings.DirectionalDepth, settings.DirectionalResolution, shadowSteps, directionalShadowSizes)))
-		{
-			pass.Initialize(accumulateShader, 0, settings.DirectionalResolution * directionalShadowCount, settings.DirectionalResolution, 1);
-			pass.ReadBuffer("ParticleShadowStep", shadowSteps);
-			pass.WriteBuffer("ParticleShadowStep", shadowSteps);
-			pass.WriteTexture("ParticleShadowWrite", result);
-			pass.ReadTexture("ParticleExtinction", directionalShadows);
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    pass.SetInt("ParticleShadowDepthInt", data.DirectionalDepth);
+                    pass.SetInt("ParticleShadowResolutionInt", data.DirectionalResolution);
+                    command.SetBufferData(pass.GetBuffer(data.shadowSteps), data.directionalShadowSizes);
+                    ArrayPool<float>.Release(data.directionalShadowSizes);
+                });
+            }
 
-			pass.SetRenderFunction(static (command, pass, data) =>
-			{
-				pass.SetInt("ParticleShadowDepthInt", data.DirectionalDepth);
-				pass.SetInt("ParticleShadowResolutionInt", data.DirectionalResolution);
-				command.SetBufferData(pass.GetBuffer(data.shadowSteps), data.directionalShadowSizes);
-				ArrayPool<float>.Release(data.directionalShadowSizes);
-			});
-		}
+            //using (renderGraph.AddProfileScope("Point Shadows"))
+            //{
+            //	for (var i = 0; i < requestData.PointShadowRequests.Count; i++)
+            //	{
+            //		using (renderGraph.AddProfileScope(pointLightIds[i]))
+            //		{
+            //			var request = requestData.PointShadowRequests[i];
+            //			RenderShadowMap(request, BatchCullingProjectionType.Perspective, pointShadows, i, settings.PointShadowBias, settings.PointShadowSlopeBias, false, true, true);
+            //		}
+            //	}
+            //	ListPool<ShadowRequest>.Release(requestData.PointShadowRequests);
+            //}
 
-		//using (renderGraph.AddProfileScope("Point Shadows"))
-		//{
-		//	for (var i = 0; i < requestData.PointShadowRequests.Count; i++)
-		//	{
-		//		using (renderGraph.AddProfileScope(pointLightIds[i]))
-		//		{
-		//			var request = requestData.PointShadowRequests[i];
-		//			RenderShadowMap(request, BatchCullingProjectionType.Perspective, pointShadows, i, settings.PointShadowBias, settings.PointShadowSlopeBias, false, true, true);
-		//		}
-		//	}
-		//	ListPool<ShadowRequest>.Release(requestData.PointShadowRequests);
-		//}
+            //using (renderGraph.AddProfileScope("Spot Shadows"))
+            //{
+            //	for (var i = 0; i < requestData.SpotShadowRequests.Count; i++)
+            //	{
+            //		using (renderGraph.AddProfileScope(SpotLightIds[i]))
+            //		{
+            //			var request = requestData.SpotShadowRequests[i];
+            //			RenderShadowMap(request, BatchCullingProjectionType.Perspective, spotShadows, i, settings.SpotShadowBias, settings.SpotShadowSlopeBias, true, true, false);
+            //		}
+            //	}
 
-		//using (renderGraph.AddProfileScope("Spot Shadows"))
-		//{
-		//	for (var i = 0; i < requestData.SpotShadowRequests.Count; i++)
-		//	{
-		//		using (renderGraph.AddProfileScope(SpotLightIds[i]))
-		//		{
-		//			var request = requestData.SpotShadowRequests[i];
-		//			RenderShadowMap(request, BatchCullingProjectionType.Perspective, spotShadows, i, settings.SpotShadowBias, settings.SpotShadowSlopeBias, true, true, false);
-		//		}
-		//	}
+            //	ListPool<ShadowRequest>.Release(requestData.SpotShadowRequests);
+            //}
 
-		//	ListPool<ShadowRequest>.Release(requestData.SpotShadowRequests);
-		//}
-
-		renderGraph.SetResource(new ParticleShadowData(result/*, pointShadows, spotShadows*/));
-	}
+            renderGraph.SetResource(new ParticleShadowData(result/*, pointShadows, spotShadows*/));
+        }
+    }
 }

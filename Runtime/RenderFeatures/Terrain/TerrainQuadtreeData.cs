@@ -1,18 +1,21 @@
 ﻿using UnityEngine;
 using UnityEngine.Rendering;
 
-public readonly struct TerrainQuadtreeData : IRenderPassData
+namespace CustomRenderPipeline
 {
-	private readonly ResourceHandle<GraphicsBuffer> terrainQuadtreeData;
+    public readonly struct TerrainQuadtreeData : IRenderPassData
+    {
+        private readonly ResourceHandle<GraphicsBuffer> terrainQuadtreeData;
 
-	public TerrainQuadtreeData(ResourceHandle<GraphicsBuffer> terrainQuadtreeData) => this.terrainQuadtreeData = terrainQuadtreeData;
+        public TerrainQuadtreeData(ResourceHandle<GraphicsBuffer> terrainQuadtreeData) => this.terrainQuadtreeData = terrainQuadtreeData;
 
-	void IRenderPassData.SetInputs(RenderPass pass)
-	{
-		pass.ReadBuffer("TerrainQuadtreeData", terrainQuadtreeData);
-	}
+        void IRenderPassData.SetInputs(RenderPass pass)
+        {
+            pass.ReadBuffer("TerrainQuadtreeData", terrainQuadtreeData);
+        }
 
-	void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
-	{
-	}
+        void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
+        {
+        }
+    }
 }

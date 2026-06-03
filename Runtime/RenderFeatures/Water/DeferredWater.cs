@@ -5,160 +5,76 @@ using UnityEngine.Rendering;
 using Unmath;
 using static Unmath.Math;
 
-public class DeferredWater : ViewRenderFeature
+namespace CustomRenderPipeline
 {
-	private static readonly int _FoamTexId = Shader.PropertyToID("_FoamTex");
-	private static readonly int _FoamBumpId = Shader.PropertyToID("_FoamBump");
-
-	private readonly WaterSettings settings;
-    private readonly Material deferredWaterMaterial;
-    private readonly PersistentRTHandleCache temporalCache;
-    private readonly RayTracingShader raytracingShader;
-
-    public DeferredWater(RenderGraph renderGraph, WaterSettings settings) : base(renderGraph)
+    public class DeferredWater : ViewRenderFeature
     {
-        this.settings = settings;
-        deferredWaterMaterial = new Material(Shader.Find("Hidden/Deferred Water")) { hideFlags = HideFlags.HideAndDontSave };
-        temporalCache = new PersistentRTHandleCache(GraphicsFormat.A2B10G10R10_UNormPack32, renderGraph, "Water Scatter Temporal", isScreenTexture: true);
-        raytracingShader = Resources.Load<RayTracingShader>("Raytracing/Refraction");
-    }
+        private static readonly int _FoamTexId = Shader.PropertyToID("_FoamTex");
+        private static readonly int _FoamBumpId = Shader.PropertyToID("_FoamBump");
 
-    protected override void Cleanup(bool disposing)
-    {
-        temporalCache.Dispose();
-    }
+        private readonly WaterSettings settings;
+        private readonly Material deferredWaterMaterial;
+        private readonly PersistentRTHandleCache temporalCache;
+        private readonly RayTracingShader raytracingShader;
 
-    public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
-    {
-		if (!settings.IsEnabled || (viewPassData.cameraType != CameraType.Game && viewPassData.cameraType != CameraType.SceneView))
-			return;
-
-		using var scope = renderGraph.AddProfileScope("Deferred Water");
-
-        var scatterResult = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true, clear: true);
-
-		using (var pass = renderGraph.AddFullscreenRenderPass("Render", settings))
+        public DeferredWater(RenderGraph renderGraph, WaterSettings settings) : base(renderGraph)
         {
-            pass.Initialize(deferredWaterMaterial, viewPassData.viewSize, viewPassData.viewCount, isScreenPass: true);
-            pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
-            pass.WriteRtHandle<GBufferAlbedoMetallic>();
-            pass.WriteRtHandle<GBufferNormalRoughness>();
-            pass.WriteRtHandle<GBufferBentNormalOcclusion>();
-            pass.WriteRtHandle<CameraTarget>();
-            pass.WriteTexture(scatterResult);
-            pass.PreventNewSubPass = true;
-
-            pass.ReadResource<AtmospherePropertiesAndTables>();
-            pass.ReadResource<AutoExposureData>();
-            pass.ReadResource<WaterShadowResult>();
-            pass.ReadResource<LightingSetup.Result>();
-            pass.ReadResource<ShadowData>();
-            pass.ReadResource<DfgData>();
-            pass.ReadResource<CloudShadowDataResult>();
-            pass.ReadResource<WaterPrepassResult>();
-            pass.ReadResource<UnderwaterLightingResult>();
-            pass.ReadResource<LightingData>();
-            pass.ReadResource<EnvironmentData>();
-
-            pass.ReadResource<OceanFftResult>();
-            //pass.ReadResource<WaterShoreMask.Result>(true);
-            pass.ReadResource<ViewData>();
-            pass.ReadResource<FrameData>();
-            pass.ReadResource<CausticsResult>();
-            pass.ReadRtHandle<CameraDepth>();
-            pass.ReadRtHandle<CameraStencil>();
-			pass.ReadRtHandle<CameraDepthCopy>();
-
-			pass.SetRenderFunction(static (command, pass, settings) =>
-            {
-                var material = settings.Material;
-
-                var albedo = settings.Material.GetColor("Albedo").LinearFloat3();
-                var transmittance = settings.Material.GetColor("Transmittance").LinearFloat3();
-                var transmittanceDistance = settings.Material.GetFloat("TransmittanceDistance");
-                var extinction = -new Float3(Log(transmittance.x), Log(transmittance.y), Log(transmittance.z)) / transmittanceDistance;
-
-                pass.SetVector("Albedo", albedo);
-                pass.SetVector("Extinction", extinction);
-                pass.SetFloat("_WaterMieFactor", material.GetFloat("_MieFactor"));
-                pass.SetFloat("_WaterMiePhase", material.GetFloat("_MiePhase"));
-
-                pass.SetFloat("_RefractOffset", material.GetFloat("_RefractOffset"));
-
-                pass.SetFloat("_WaveFoamStrength", settings.Material.GetFloat("_WaveFoamStrength"));
-                pass.SetFloat("_WaveFoamFalloff", settings.Material.GetFloat("_WaveFoamFalloff"));
-                pass.SetFloat("_FoamNormalScale", settings.Material.GetFloat("_FoamNormalScale"));
-                pass.SetFloat("_FoamSmoothness", settings.Material.GetFloat("_FoamSmoothness"));
-                pass.SetFloat("_Smoothness", settings.Material.GetFloat("_Smoothness"));
-
-                var foamScale = settings.Material.GetTextureScale(_FoamTexId);
-                var foamOffset = settings.Material.GetTextureOffset(_FoamTexId);
-
-                pass.SetVector("_FoamTex_ST", new Vector4(foamScale.x, foamScale.y, foamOffset.x, foamOffset.y));
-                pass.SetTexture(_FoamTexId, settings.Material.GetTexture(_FoamTexId));
-                pass.SetTexture(_FoamBumpId, settings.Material.GetTexture(_FoamBumpId));
-
-                pass.SetFloat("_ShoreWaveLength", material.GetFloat("_ShoreWaveLength"));
-                pass.SetFloat("_ShoreWaveHeight", material.GetFloat("_ShoreWaveHeight"));
-                pass.SetFloat("_ShoreWaveWindSpeed", settings.Profile.WindSpeed);
-                pass.SetFloat("_ShoreWaveWindAngle", settings.Profile.WindAngle);
-                pass.SetFloat("_ShoreWaveSteepness", material.GetFloat("_ShoreWaveSteepness"));
-            });
+            this.settings = settings;
+            deferredWaterMaterial = new Material(Shader.Find("Hidden/Deferred Water")) { hideFlags = HideFlags.HideAndDontSave };
+            temporalCache = new PersistentRTHandleCache(GraphicsFormat.A2B10G10R10_UNormPack32, renderGraph, "Water Scatter Temporal", isScreenTexture: true);
+            raytracingShader = Resources.Load<RayTracingShader>("Raytracing/Refraction");
         }
 
-        if (settings.RaytracedRefractions)
+        protected override void Cleanup(bool disposing)
         {
-            // Need to set some things as globals so that hit shaders can access them..
-            using (var pass = renderGraph.AddGenericRenderPass("Raytraced Refractions Setup"))
-            {
-				pass.AddKeyword("UNDERWATER_LIGHTING_ON");
+            temporalCache.Dispose();
+        }
 
-                pass.ReadResource<SkyReflectionAmbientData>();
-                pass.ReadResource<LightingSetup.Result>();
-                pass.ReadResource<AutoExposureData>();
+        public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+        {
+            if (!settings.IsEnabled || (viewPassData.cameraType != CameraType.Game && viewPassData.cameraType != CameraType.SceneView))
+                return;
+
+            using var scope = renderGraph.AddProfileScope("Deferred Water");
+
+            var scatterResult = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true, clear: true);
+
+            using (var pass = renderGraph.AddFullscreenRenderPass("Render", settings))
+            {
+                pass.Initialize(deferredWaterMaterial, viewPassData.viewSize, viewPassData.viewCount, isScreenPass: true);
+                pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
+                pass.WriteRtHandle<GBufferAlbedoMetallic>();
+                pass.WriteRtHandle<GBufferNormalRoughness>();
+                pass.WriteRtHandle<GBufferBentNormalOcclusion>();
+                pass.WriteRtHandle<CameraTarget>();
+                pass.WriteTexture(scatterResult);
+                pass.PreventNewSubPass = true;
+
                 pass.ReadResource<AtmospherePropertiesAndTables>();
-			    pass.ReadResource<TerrainFrameData>(true);
-                pass.ReadResource<TerrainViewData>(true);
-                pass.ReadResource<CloudShadowDataResult>();
+                pass.ReadResource<AutoExposureData>();
+                pass.ReadResource<WaterShadowResult>();
+                pass.ReadResource<LightingSetup.Result>();
                 pass.ReadResource<ShadowData>();
                 pass.ReadResource<DfgData>();
-                pass.ReadResource<WaterShadowResult>();
+                pass.ReadResource<CloudShadowDataResult>();
                 pass.ReadResource<WaterPrepassResult>();
-                pass.ReadResource<FrameData>();
-                pass.ReadResource<ViewData>();
-                pass.ReadResource<OceanFftResult>();
-                pass.ReadResource<CausticsResult>();
-                pass.ReadResource<EnvironmentData>();
-            }
-
-			using (var pass = renderGraph.AddRaytracingRenderPass("Water Raytraced Refractions", settings))
-            {
-				pass.AddKeyword("UNDERWATER_LIGHTING_ON");
-
-				var refractionResult = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
-				var raytracingData = renderGraph.GetResource<RaytracingResult>();
-
-                pass.Initialize(raytracingShader, "RayGeneration", "Raytracing", raytracingData.Rtas, viewPassData.viewSize.x, viewPassData.viewSize.y, 1, 0.1f, 0.1f, viewPassData.tanHalfFov.y);
-                //pass.WriteTexture(refractionResult, "RefractionResult");
-                pass.WriteTexture(scatterResult, "ScatterResult");
-                //pass.WriteTexture(tempResult, "HitColor");
-                //pass.WriteTexture(hitResult, "HitResult");
-                //pass.ReadTexture("PreviousFrame", previousFrameColor); // Temporary, cuz of leaks if we don't use it..
-
-                pass.ReadRtHandle<GBufferNormalRoughness>();
-                pass.ReadResource<AtmospherePropertiesAndTables>();
-				pass.ReadResource<WaterShadowResult>();
+                pass.ReadResource<UnderwaterLightingResult>();
                 pass.ReadResource<LightingData>();
+                pass.ReadResource<EnvironmentData>();
+
+                pass.ReadResource<OceanFftResult>();
+                //pass.ReadResource<WaterShoreMask.Result>(true);
                 pass.ReadResource<ViewData>();
                 pass.ReadResource<FrameData>();
-                pass.ReadResource<OceanFftResult>();
                 pass.ReadResource<CausticsResult>();
                 pass.ReadRtHandle<CameraDepth>();
                 pass.ReadRtHandle<CameraStencil>();
-				pass.ReadResource<EnvironmentData>();
+                pass.ReadRtHandle<CameraDepthCopy>();
 
-				pass.SetRenderFunction(static (command, pass, settings) =>
+                pass.SetRenderFunction(static (command, pass, settings) =>
                 {
+                    var material = settings.Material;
+
                     var albedo = settings.Material.GetColor("Albedo").LinearFloat3();
                     var transmittance = settings.Material.GetColor("Transmittance").LinearFloat3();
                     var transmittanceDistance = settings.Material.GetFloat("TransmittanceDistance");
@@ -166,57 +82,144 @@ public class DeferredWater : ViewRenderFeature
 
                     pass.SetVector("Albedo", albedo);
                     pass.SetVector("Extinction", extinction);
+                    pass.SetFloat("_WaterMieFactor", material.GetFloat("_MieFactor"));
+                    pass.SetFloat("_WaterMiePhase", material.GetFloat("_MiePhase"));
+
+                    pass.SetFloat("_RefractOffset", material.GetFloat("_RefractOffset"));
+
+                    pass.SetFloat("_WaveFoamStrength", settings.Material.GetFloat("_WaveFoamStrength"));
+                    pass.SetFloat("_WaveFoamFalloff", settings.Material.GetFloat("_WaveFoamFalloff"));
+                    pass.SetFloat("_FoamNormalScale", settings.Material.GetFloat("_FoamNormalScale"));
+                    pass.SetFloat("_FoamSmoothness", settings.Material.GetFloat("_FoamSmoothness"));
+                    pass.SetFloat("_Smoothness", settings.Material.GetFloat("_Smoothness"));
+
+                    var foamScale = settings.Material.GetTextureScale(_FoamTexId);
+                    var foamOffset = settings.Material.GetTextureOffset(_FoamTexId);
+
+                    pass.SetVector("_FoamTex_ST", new Vector4(foamScale.x, foamScale.y, foamOffset.x, foamOffset.y));
+                    pass.SetTexture(_FoamTexId, settings.Material.GetTexture(_FoamTexId));
+                    pass.SetTexture(_FoamBumpId, settings.Material.GetTexture(_FoamBumpId));
+
+                    pass.SetFloat("_ShoreWaveLength", material.GetFloat("_ShoreWaveLength"));
+                    pass.SetFloat("_ShoreWaveHeight", material.GetFloat("_ShoreWaveHeight"));
+                    pass.SetFloat("_ShoreWaveWindSpeed", settings.Profile.WindSpeed);
+                    pass.SetFloat("_ShoreWaveWindAngle", settings.Profile.WindAngle);
+                    pass.SetFloat("_ShoreWaveSteepness", material.GetFloat("_ShoreWaveSteepness"));
                 });
             }
-        }
-
-		bool wasCreated = default;
-		ResourceHandle<RenderTexture> current, history = default;
-        using (var pass = renderGraph.AddFullscreenRenderPass("Temporal", (wasCreated, history, settings)))
-        {
-			(current, history, wasCreated) = temporalCache.GetTextures(viewPassData.viewSize, pass.Index, viewPassData.viewId);
-
-			pass.renderData.history = history;
-			pass.renderData.wasCreated = wasCreated;
-            pass.PreventNewSubPass = true;
 
             if (settings.RaytracedRefractions)
-                pass.AddKeyword("RAYTRACED_REFRACTIONS_ON");
-
-            pass.Initialize(deferredWaterMaterial, viewPassData.viewSize, viewPassData.viewCount, 1, isScreenPass: true);
-            pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
-            pass.WriteTexture(current);
-            pass.WriteRtHandle<CameraTarget>();
-            pass.ReadTexture("_ScatterInput", scatterResult);
-            pass.ReadTexture("_History", history);
-
-			pass.ReadRtHandle<GBufferNormalRoughness>();
-			pass.ReadRtHandle<GBufferBentNormalOcclusion>();
-			pass.ReadRtHandle<GBufferAlbedoMetallic>();
-			pass.ReadResource<TemporalAAData>();
-            pass.ReadResource<AutoExposureData>();
-            pass.ReadResource<SkyReflectionAmbientData>();
-            pass.ReadResource<DfgData>();
-            pass.ReadResource<ViewData>();
-            pass.ReadResource<FrameData>();
-            pass.ReadRtHandle<CameraVelocity>();
-            pass.ReadRtHandle<CameraDepth>();
-            pass.ReadRtHandle<CameraStencil>();
-            pass.ReadRtHandle<CameraDepthCopy>();
-
-            pass.SetRenderFunction(static (command, pass, data) =>
             {
-                var albedo = data.settings.Material.GetColor("Albedo").LinearFloat3();
-                var transmittance = data.settings.Material.GetColor("Transmittance").LinearFloat3();
-                var transmittanceDistance = data.settings.Material.GetFloat("TransmittanceDistance");
-                var extinction = -new Float3(Log(transmittance.x), Log(transmittance.y), Log(transmittance.z)) / transmittanceDistance;
+                // Need to set some things as globals so that hit shaders can access them..
+                using (var pass = renderGraph.AddGenericRenderPass("Raytraced Refractions Setup"))
+                {
+                    pass.AddKeyword("UNDERWATER_LIGHTING_ON");
 
-                pass.SetFloat("_IsFirst", data.wasCreated ? 1.0f : 0.0f);
-                pass.SetVector("_HistoryScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.history));
+                    pass.ReadResource<SkyReflectionAmbientData>();
+                    pass.ReadResource<LightingSetup.Result>();
+                    pass.ReadResource<AutoExposureData>();
+                    pass.ReadResource<AtmospherePropertiesAndTables>();
+                    pass.ReadResource<TerrainFrameData>(true);
+                    pass.ReadResource<TerrainViewData>(true);
+                    pass.ReadResource<CloudShadowDataResult>();
+                    pass.ReadResource<ShadowData>();
+                    pass.ReadResource<DfgData>();
+                    pass.ReadResource<WaterShadowResult>();
+                    pass.ReadResource<WaterPrepassResult>();
+                    pass.ReadResource<FrameData>();
+                    pass.ReadResource<ViewData>();
+                    pass.ReadResource<OceanFftResult>();
+                    pass.ReadResource<CausticsResult>();
+                    pass.ReadResource<EnvironmentData>();
+                }
 
-                pass.SetVector("Albedo", albedo);
-                pass.SetVector("Extinction", extinction);
-            });
+                using (var pass = renderGraph.AddRaytracingRenderPass("Water Raytraced Refractions", settings))
+                {
+                    pass.AddKeyword("UNDERWATER_LIGHTING_ON");
+
+                    var refractionResult = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
+                    var raytracingData = renderGraph.GetResource<RaytracingResult>();
+
+                    pass.Initialize(raytracingShader, "RayGeneration", "Raytracing", raytracingData.Rtas, viewPassData.viewSize.x, viewPassData.viewSize.y, 1, 0.1f, 0.1f, viewPassData.tanHalfFov.y);
+                    //pass.WriteTexture(refractionResult, "RefractionResult");
+                    pass.WriteTexture(scatterResult, "ScatterResult");
+                    //pass.WriteTexture(tempResult, "HitColor");
+                    //pass.WriteTexture(hitResult, "HitResult");
+                    //pass.ReadTexture("PreviousFrame", previousFrameColor); // Temporary, cuz of leaks if we don't use it..
+
+                    pass.ReadRtHandle<GBufferNormalRoughness>();
+                    pass.ReadResource<AtmospherePropertiesAndTables>();
+                    pass.ReadResource<WaterShadowResult>();
+                    pass.ReadResource<LightingData>();
+                    pass.ReadResource<ViewData>();
+                    pass.ReadResource<FrameData>();
+                    pass.ReadResource<OceanFftResult>();
+                    pass.ReadResource<CausticsResult>();
+                    pass.ReadRtHandle<CameraDepth>();
+                    pass.ReadRtHandle<CameraStencil>();
+                    pass.ReadResource<EnvironmentData>();
+
+                    pass.SetRenderFunction(static (command, pass, settings) =>
+                    {
+                        var albedo = settings.Material.GetColor("Albedo").LinearFloat3();
+                        var transmittance = settings.Material.GetColor("Transmittance").LinearFloat3();
+                        var transmittanceDistance = settings.Material.GetFloat("TransmittanceDistance");
+                        var extinction = -new Float3(Log(transmittance.x), Log(transmittance.y), Log(transmittance.z)) / transmittanceDistance;
+
+                        pass.SetVector("Albedo", albedo);
+                        pass.SetVector("Extinction", extinction);
+                    });
+                }
+            }
+
+            bool wasCreated = default;
+            ResourceHandle<RenderTexture> current, history = default;
+            using (var pass = renderGraph.AddFullscreenRenderPass("Temporal", (wasCreated, history, settings)))
+            {
+                (current, history, wasCreated) = temporalCache.GetTextures(viewPassData.viewSize, pass.Index, viewPassData.viewId);
+
+                pass.renderData.history = history;
+                pass.renderData.wasCreated = wasCreated;
+                pass.PreventNewSubPass = true;
+
+                if (settings.RaytracedRefractions)
+                    pass.AddKeyword("RAYTRACED_REFRACTIONS_ON");
+
+                pass.Initialize(deferredWaterMaterial, viewPassData.viewSize, viewPassData.viewCount, 1, isScreenPass: true);
+                pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
+                pass.WriteTexture(current);
+                pass.WriteRtHandle<CameraTarget>();
+                pass.ReadTexture("_ScatterInput", scatterResult);
+                pass.ReadTexture("_History", history);
+
+                pass.ReadRtHandle<GBufferNormalRoughness>();
+                pass.ReadRtHandle<GBufferBentNormalOcclusion>();
+                pass.ReadRtHandle<GBufferAlbedoMetallic>();
+                pass.ReadResource<TemporalAAData>();
+                pass.ReadResource<AutoExposureData>();
+                pass.ReadResource<SkyReflectionAmbientData>();
+                pass.ReadResource<DfgData>();
+                pass.ReadResource<ViewData>();
+                pass.ReadResource<FrameData>();
+                pass.ReadRtHandle<CameraVelocity>();
+                pass.ReadRtHandle<CameraDepth>();
+                pass.ReadRtHandle<CameraStencil>();
+                pass.ReadRtHandle<CameraDepthCopy>();
+
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    var albedo = data.settings.Material.GetColor("Albedo").LinearFloat3();
+                    var transmittance = data.settings.Material.GetColor("Transmittance").LinearFloat3();
+                    var transmittanceDistance = data.settings.Material.GetFloat("TransmittanceDistance");
+                    var extinction = -new Float3(Log(transmittance.x), Log(transmittance.y), Log(transmittance.z)) / transmittanceDistance;
+
+                    pass.SetFloat("_IsFirst", data.wasCreated ? 1.0f : 0.0f);
+                    pass.SetVector("_HistoryScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.history));
+
+                    pass.SetVector("Albedo", albedo);
+                    pass.SetVector("Extinction", extinction);
+                });
+            }
         }
     }
 }

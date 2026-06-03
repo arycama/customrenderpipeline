@@ -3,75 +3,78 @@ using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 
-public class TerrainShadowRenderer : TerrainRendererBase
+namespace CustomRenderPipeline
 {
-	public TerrainShadowRenderer(RenderGraph renderGraph, TerrainSettings settings, QuadtreeCull quadtreeCull) : base(renderGraph, settings, quadtreeCull)
-	{
-	}
-
-	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+    public class TerrainShadowRenderer : TerrainRendererBase
     {
-		if (!renderGraph.TryGetResource<TerrainSystemData>(out var terrainSystemData))
-			return;
+        public TerrainShadowRenderer(RenderGraph renderGraph, TerrainSettings settings, QuadtreeCull quadtreeCull) : base(renderGraph, settings, quadtreeCull)
+        {
+        }
 
-		// Also ensure this is valid for current frame
-		if (!renderGraph.TryGetResource<TerrainViewData>(out var terrainRenderData))
-			return;
+        public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+        {
+            if (!renderGraph.TryGetResource<TerrainSystemData>(out var terrainSystemData))
+                return;
 
-		var terrain = terrainSystemData.terrain;
-		var terrainData = terrainSystemData.terrainData;
+            // Also ensure this is valid for current frame
+            if (!renderGraph.TryGetResource<TerrainViewData>(out var terrainRenderData))
+                return;
 
-		if (terrainSystemData.terrain == null || settings.Material == null)
-			return;
+            var terrain = terrainSystemData.terrain;
+            var terrainData = terrainSystemData.terrainData;
 
-		var shadowRequestData = renderGraph.GetResource<ShadowRequestData>();
-		var shadowRequest = shadowRequestData.ShadowRequest;
+            if (terrainSystemData.terrain == null || settings.Material == null)
+                return;
 
-		var cullingPlanes = new CullingPlanes() { Count = shadowRequest.ShadowSplitData.cullingPlaneCount };
-		for (var i = 0; i < cullingPlanes.Count; i++)
-		{
-			var plane = shadowRequest.ShadowSplitData.GetCullingPlane(i);
-			plane.Translate(viewPassData.position);
-			cullingPlanes.SetCullingPlane(i, plane);
-		}
+            var shadowRequestData = renderGraph.GetResource<ShadowRequestData>();
+            var shadowRequest = shadowRequestData.ShadowRequest;
 
-		var passData = Cull(viewPassData.position, cullingPlanes, viewPassData.viewSize);
+            var cullingPlanes = new CullingPlanes() { Count = shadowRequest.ShadowSplitData.cullingPlaneCount };
+            for (var i = 0; i < cullingPlanes.Count; i++)
+            {
+                var plane = shadowRequest.ShadowSplitData.GetCullingPlane(i);
+                plane.Translate(viewPassData.position);
+                cullingPlanes.SetCullingPlane(i, plane);
+            }
 
-		var passIndex = settings.Material.FindPass("ShadowCaster");
-		Assert.IsFalse(passIndex == -1, "Terrain Material has no ShadowCaster Pass");
+            var passData = Cull(viewPassData.position, cullingPlanes, viewPassData.viewSize);
 
-		var size = terrainData.size;
-		var position = terrain.GetPosition() - viewPassData.position;
+            var passIndex = settings.Material.FindPass("ShadowCaster");
+            Assert.IsFalse(passIndex == -1, "Terrain Material has no ShadowCaster Pass");
 
-		using (var pass = renderGraph.AddDrawProceduralIndirectIndexedRenderPass("Terrain Render", cullingPlanes))
-		{
-			pass.Initialize(settings.Material, terrainSystemData.indexBuffer, passData.IndirectArgsBuffer, shadowRequest.Resolution, 1, MeshTopology.Quads, passIndex, shadowRequestData.Bias, shadowRequestData.SlopeBias, shadowRequestData.ZClip);
+            var size = terrainData.size;
+            var position = terrain.GetPosition() - viewPassData.position;
 
-			pass.WriteDepth(shadowRequestData.Shadow);
-			pass.DepthSlice = shadowRequestData.CascadeIndex;
+            using (var pass = renderGraph.AddDrawProceduralIndirectIndexedRenderPass("Terrain Render", cullingPlanes))
+            {
+                pass.Initialize(settings.Material, terrainSystemData.indexBuffer, passData.IndirectArgsBuffer, shadowRequest.Resolution, 1, MeshTopology.Quads, passIndex, shadowRequestData.Bias, shadowRequestData.SlopeBias, shadowRequestData.ZClip);
 
-			pass.ReadBuffer("PatchData", passData.PatchDataBuffer);
+                pass.WriteDepth(shadowRequestData.Shadow);
+                pass.DepthSlice = shadowRequestData.CascadeIndex;
 
-			pass.ReadResource<ShadowRequestData>();
-		    pass.ReadResource<TerrainFrameData>();
-			pass.ReadResource<TerrainViewData>();
-			pass.ReadResource<TerrainQuadtreeData>();
-			pass.ReadResource<ViewData>();
+                pass.ReadBuffer("PatchData", passData.PatchDataBuffer);
 
-            if (pass.TryReadResource<VirtualTextureData>())
-                pass.AddKeyword("VIRTUAL_TEXTURING_ON");
+                pass.ReadResource<ShadowRequestData>();
+                pass.ReadResource<TerrainFrameData>();
+                pass.ReadResource<TerrainViewData>();
+                pass.ReadResource<TerrainQuadtreeData>();
+                pass.ReadResource<ViewData>();
 
-            pass.SetRenderFunction(static (command, pass, cullingPlanes) =>
-			{
-                // TODO: Put into a struct?
-                pass.SetInt("_CullingPlanesCount", cullingPlanes.Count);
-                var cullingPlanesArray = ArrayPool<Vector4>.Get(cullingPlanes.Count);
-                for (var i = 0; i < cullingPlanes.Count; i++)
-                    cullingPlanesArray[i] = cullingPlanes.GetCullingPlaneVector4(i);
+                if (pass.TryReadResource<VirtualTextureData>())
+                    pass.AddKeyword("VIRTUAL_TEXTURING_ON");
 
-                pass.SetVectorArray("_CullingPlanes", cullingPlanesArray);
-                ArrayPool<Vector4>.Release(cullingPlanesArray);
-            });
-		}
-	}
+                pass.SetRenderFunction(static (command, pass, cullingPlanes) =>
+                {
+                    // TODO: Put into a struct?
+                    pass.SetInt("_CullingPlanesCount", cullingPlanes.Count);
+                    var cullingPlanesArray = ArrayPool<Vector4>.Get(cullingPlanes.Count);
+                    for (var i = 0; i < cullingPlanes.Count; i++)
+                        cullingPlanesArray[i] = cullingPlanes.GetCullingPlaneVector4(i);
+
+                    pass.SetVectorArray("_CullingPlanes", cullingPlanesArray);
+                    ArrayPool<Vector4>.Release(cullingPlanesArray);
+                });
+            }
+        }
+    }
 }

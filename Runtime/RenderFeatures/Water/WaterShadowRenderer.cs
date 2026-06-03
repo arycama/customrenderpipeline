@@ -7,106 +7,109 @@ using Unmath;
 using static Unmath.Math;
 using Bounds = Unmath.Bounds;
 
-public class WaterShadowRenderer : WaterRendererBase
+namespace CustomRenderPipeline
 {
-	public WaterShadowRenderer(RenderGraph renderGraph, WaterSettings settings, QuadtreeCull quadtreeCull) : base(renderGraph, settings, quadtreeCull)
-	{
-	}
-
-	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+    public class WaterShadowRenderer : WaterRendererBase
     {
-        if (!settings.IsEnabled || (viewPassData.cameraType != CameraType.Game && viewPassData.cameraType != CameraType.SceneView))
-            return;
-
-        if (!renderGraph.TryGetResource<LightingData>(out var lightingData))
-            return;
-
-		var viewPosition = viewPassData.position;
-        var size = new Float3(settings.ShadowRadius * 2, settings.Profile.MaxWaterHeight * 2, settings.ShadowRadius * 2);
-        var min = new Float3(-settings.ShadowRadius, -settings.Profile.MaxWaterHeight - viewPosition.y, -settings.ShadowRadius);
-
-        var texelSize = settings.ShadowRadius * 2.0f / settings.ShadowResolution;
-
-        var snappedViewPositionX = Snap(viewPosition.x, texelSize) - viewPosition.x;
-        var snappedViewPositionZ = Snap(viewPosition.z, texelSize) - viewPosition.z;
-        var worldToView = Float4x4.Rotate(lightingData.light0Rotation.Inverse);
-
-		Bounds bounds = default;
-        for (int z = 0, i = 0; z < 2; z++)
+        public WaterShadowRenderer(RenderGraph renderGraph, WaterSettings settings, QuadtreeCull quadtreeCull) : base(renderGraph, settings, quadtreeCull)
         {
-            for (var y = 0; y < 2; y++)
-            {
-                for (var x = 0; x < 2; x++, i++)
-                {
-                    var worldPosition = size * new Float3(x, y, z) + min;
-                    worldPosition.x += snappedViewPositionX;
-                    worldPosition.z += snappedViewPositionZ;
+        }
 
-                    var localPoint = worldToView.MultiplyPoint3x4(worldPosition);
-                    bounds = i == 0 ? new Bounds(localPoint, Float3.Zero) : bounds.Encapsulate(localPoint);
+        public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+        {
+            if (!settings.IsEnabled || (viewPassData.cameraType != CameraType.Game && viewPassData.cameraType != CameraType.SceneView))
+                return;
+
+            if (!renderGraph.TryGetResource<LightingData>(out var lightingData))
+                return;
+
+            var viewPosition = viewPassData.position;
+            var size = new Float3(settings.ShadowRadius * 2, settings.Profile.MaxWaterHeight * 2, settings.ShadowRadius * 2);
+            var min = new Float3(-settings.ShadowRadius, -settings.Profile.MaxWaterHeight - viewPosition.y, -settings.ShadowRadius);
+
+            var texelSize = settings.ShadowRadius * 2.0f / settings.ShadowResolution;
+
+            var snappedViewPositionX = Snap(viewPosition.x, texelSize) - viewPosition.x;
+            var snappedViewPositionZ = Snap(viewPosition.z, texelSize) - viewPosition.z;
+            var worldToView = Float4x4.Rotate(lightingData.light0Rotation.Inverse);
+
+            Bounds bounds = default;
+            for (int z = 0, i = 0; z < 2; z++)
+            {
+                for (var y = 0; y < 2; y++)
+                {
+                    for (var x = 0; x < 2; x++, i++)
+                    {
+                        var worldPosition = size * new Float3(x, y, z) + min;
+                        worldPosition.x += snappedViewPositionX;
+                        worldPosition.z += snappedViewPositionZ;
+
+                        var localPoint = worldToView.MultiplyPoint3x4(worldPosition);
+                        bounds = i == 0 ? new Bounds(localPoint, Float3.Zero) : bounds.Encapsulate(localPoint);
+                    }
                 }
             }
-        }
 
-        // Calculate culling planes
-        var viewToClip = Float4x4.OrthoReverseZ(bounds);
-        var worldToClip = viewToClip.Mul(worldToView);
+            // Calculate culling planes
+            var viewToClip = Float4x4.OrthoReverseZ(bounds);
+            var worldToClip = viewToClip.Mul(worldToView);
 
-        var cullingPlanes = new CullingPlanes() { Count = 6 };
-        for (var j = FrustumPlane.Left; j < FrustumPlane.Count; j++)
-            cullingPlanes.SetCullingPlane((int)j, worldToClip.GetFrustumPlane(j));
+            var cullingPlanes = new CullingPlanes() { Count = 6 };
+            for (var j = FrustumPlane.Left; j < FrustumPlane.Count; j++)
+                cullingPlanes.SetCullingPlane((int)j, worldToClip.GetFrustumPlane(j));
 
-        var cullResult = Cull(viewPosition, cullingPlanes, viewPassData.viewSize, false);
-        var shadowMatrix = Float4x4.OrthoReverseZSample(bounds).Mul(worldToView);
+            var cullResult = Cull(viewPosition, cullingPlanes, viewPassData.viewSize, false);
+            var shadowMatrix = Float4x4.OrthoReverseZSample(bounds).Mul(worldToView);
 
-        var waterShadow = renderGraph.GetTexture(settings.ShadowResolution, GraphicsFormat.D16_UNorm, isExactSize: true, clear: true);
-        var waterIlluminance = renderGraph.GetTexture(settings.ShadowResolution, GraphicsFormat.R8_UNorm, isExactSize: true, clear: true);
+            var waterShadow = renderGraph.GetTexture(settings.ShadowResolution, GraphicsFormat.D16_UNorm, isExactSize: true, clear: true);
+            var waterIlluminance = renderGraph.GetTexture(settings.ShadowResolution, GraphicsFormat.R8_UNorm, isExactSize: true, clear: true);
 
-        var passIndex = settings.Material.FindPass("WaterShadow");
-        Assert.IsTrue(passIndex != -1, "Water Material does not contain a Water Shadow Pass");
+            var passIndex = settings.Material.FindPass("WaterShadow");
+            Assert.IsTrue(passIndex != -1, "Water Material does not contain a Water Shadow Pass");
 
-        using (var pass = renderGraph.AddDrawProceduralIndirectIndexedRenderPass("Ocean Shadow", (worldToClip, VerticesPerTileEdge, settings, viewPosition, cullingPlanes)))
-        {
-            pass.Initialize(settings.Material, indexBuffer, cullResult.IndirectArgsBuffer, settings.ShadowResolution, 1, MeshTopology.Quads, passIndex, depthBias: settings.ShadowBias, slopeDepthBias: settings.ShadowSlopeBias);
-            pass.WriteDepth(waterShadow);
-            pass.WriteTexture(waterIlluminance);
-            pass.ReadBuffer("PatchData", cullResult.PatchDataBuffer);
-
-            pass.ReadResource<OceanFftResult>();
-            pass.ReadResource<ViewData>();
-            pass.ReadResource<FrameData>();
-            pass.ReadResource<LightingData>();
-
-            pass.SetRenderFunction(static (command, pass, data) =>
+            using (var pass = renderGraph.AddDrawProceduralIndirectIndexedRenderPass("Ocean Shadow", (worldToClip, VerticesPerTileEdge, settings, viewPosition, cullingPlanes)))
             {
-                pass.SetMatrix("_WaterShadowMatrix", data.worldToClip);
-                pass.SetInt("_VerticesPerEdge", data.VerticesPerTileEdge);
-                pass.SetInt("_VerticesPerEdgeMinusOne", data.VerticesPerTileEdge - 1);
-                pass.SetFloat("_RcpVerticesPerEdgeMinusOne", 1f / (data.VerticesPerTileEdge - 1));
+                pass.Initialize(settings.Material, indexBuffer, cullResult.IndirectArgsBuffer, settings.ShadowResolution, 1, MeshTopology.Quads, passIndex, depthBias: settings.ShadowBias, slopeDepthBias: settings.ShadowSlopeBias);
+                pass.WriteDepth(waterShadow);
+                pass.WriteTexture(waterIlluminance);
+                pass.ReadBuffer("PatchData", cullResult.PatchDataBuffer);
 
-                // Snap to quad-sized increments on largest cell
-                var texelSize = data.settings.Size / (float)data.settings.PatchVertices;
-                var positionX = Snap(data.viewPosition.x, texelSize) - data.viewPosition.x - data.settings.Size * 0.5f;
-                var positionZ = Snap(data.viewPosition.z, texelSize) - data.viewPosition.z - data.settings.Size * 0.5f;
-                pass.SetVector("_PatchScaleOffset", new Vector4(data.settings.Size / (float)data.settings.CellCount, data.settings.Size / (float)data.settings.CellCount, positionX, positionZ));
+                pass.ReadResource<OceanFftResult>();
+                pass.ReadResource<ViewData>();
+                pass.ReadResource<FrameData>();
+                pass.ReadResource<LightingData>();
 
-                var cullingPlanesArray = ArrayPool<Vector4>.Get(data.cullingPlanes.Count);
-                for (var i = 0; i < data.cullingPlanes.Count; i++)
-                    cullingPlanesArray[i] = data.cullingPlanes.GetCullingPlaneVector4(i);
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    pass.SetMatrix("_WaterShadowMatrix", data.worldToClip);
+                    pass.SetInt("_VerticesPerEdge", data.VerticesPerTileEdge);
+                    pass.SetInt("_VerticesPerEdgeMinusOne", data.VerticesPerTileEdge - 1);
+                    pass.SetFloat("_RcpVerticesPerEdgeMinusOne", 1f / (data.VerticesPerTileEdge - 1));
 
-                pass.SetVectorArray("_CullingPlanes", cullingPlanesArray);
-                ArrayPool<Vector4>.Release(cullingPlanesArray);
+                    // Snap to quad-sized increments on largest cell
+                    var texelSize = data.settings.Size / (float)data.settings.PatchVertices;
+                    var positionX = Snap(data.viewPosition.x, texelSize) - data.viewPosition.x - data.settings.Size * 0.5f;
+                    var positionZ = Snap(data.viewPosition.z, texelSize) - data.viewPosition.z - data.settings.Size * 0.5f;
+                    pass.SetVector("_PatchScaleOffset", new Vector4(data.settings.Size / (float)data.settings.CellCount, data.settings.Size / (float)data.settings.CellCount, positionX, positionZ));
 
-                pass.SetInt("_CullingPlanesCount", data.cullingPlanes.Count);
-                pass.SetFloat("_ShoreWaveWindSpeed", data.settings.Profile.WindSpeed);
-                pass.SetFloat("_ShoreWaveWindAngle", data.settings.Profile.WindAngle);
-            });
+                    var cullingPlanesArray = ArrayPool<Vector4>.Get(data.cullingPlanes.Count);
+                    for (var i = 0; i < data.cullingPlanes.Count; i++)
+                        cullingPlanesArray[i] = data.cullingPlanes.GetCullingPlaneVector4(i);
+
+                    pass.SetVectorArray("_CullingPlanes", cullingPlanesArray);
+                    ArrayPool<Vector4>.Release(cullingPlanesArray);
+
+                    pass.SetInt("_CullingPlanesCount", data.cullingPlanes.Count);
+                    pass.SetFloat("_ShoreWaveWindSpeed", data.settings.Profile.WindSpeed);
+                    pass.SetFloat("_ShoreWaveWindAngle", data.settings.Profile.WindAngle);
+                });
+            }
+
+            var transmittance = settings.Material.GetColor("Transmittance").LinearFloat3();
+            var transmittanceDistance = settings.Material.GetFloat("TransmittanceDistance");
+            var extinction = -new Float3(Log(transmittance.x), Log(transmittance.y), Log(transmittance.z)) / transmittanceDistance;
+
+            renderGraph.SetResource(new WaterShadowResult(waterShadow, shadowMatrix, 0.0f, (float)(bounds.Max.z - bounds.Min.z), extinction, waterIlluminance));
         }
-
-        var transmittance = settings.Material.GetColor("Transmittance").LinearFloat3();
-        var transmittanceDistance = settings.Material.GetFloat("TransmittanceDistance");
-        var extinction = -new Float3(Log(transmittance.x), Log(transmittance.y), Log(transmittance.z)) / transmittanceDistance;
-
-        renderGraph.SetResource(new WaterShadowResult(waterShadow, shadowMatrix, 0.0f, (float)(bounds.Max.z - bounds.Min.z), extinction, waterIlluminance));
     }
 }

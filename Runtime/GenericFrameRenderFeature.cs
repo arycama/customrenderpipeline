@@ -1,18 +1,21 @@
 ﻿using UnityEngine.Rendering;
 
-public class GenericFrameRenderFeature : FrameRenderFeature
+namespace CustomRenderPipeline
 {
-    public delegate void RenderFunction(ScriptableRenderContext context);
+    public class GenericFrameRenderFeature : FrameRenderFeature
+    {
+        public delegate void RenderFunction(ScriptableRenderContext context);
 
-    private readonly RenderFunction render;
+        private readonly RenderFunction render;
 
-	public GenericFrameRenderFeature(RenderGraph renderGraph, RenderFunction render) : base(renderGraph)
-	{
-		this.render = render;
-	}
+        public GenericFrameRenderFeature(RenderGraph renderGraph, RenderFunction render) : base(renderGraph)
+        {
+            this.render = render;
+        }
 
-	public override void Render(ScriptableRenderContext context)
-	{
-		render(context);
-	}
+        public override void Render(ScriptableRenderContext context)
+        {
+            render(context);
+        }
+    }
 }

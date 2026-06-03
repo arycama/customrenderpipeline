@@ -3,125 +3,128 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public partial class DepthOfField : ViewRenderFeature
+namespace CustomRenderPipeline
 {
-	private readonly Settings settings;
-	private readonly LensSettings lensSettings;
-	private readonly Material material;
-	private readonly RayTracingShader raytracingShader;
-	private TemporalAA.Settings taaSettings;
-
-	public DepthOfField(Settings settings, LensSettings lensSettings, RenderGraph renderGraph, TemporalAA.Settings taaSettings) : base(renderGraph)
-	{
-		this.settings = settings;
-		this.lensSettings = lensSettings;
-		this.taaSettings = taaSettings;
-
-		material = new Material(Shader.Find("Hidden/Depth of Field")) { hideFlags = HideFlags.HideAndDontSave };
-		raytracingShader = Resources.Load<RayTracingShader>("Raytracing/DepthOfField");
-	}
-
-	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+    public partial class DepthOfField : ViewRenderFeature
     {
-		if (!settings.IsEnabled)
-			return;
+        private readonly Settings settings;
+        private readonly LensSettings lensSettings;
+        private readonly Material material;
+        private readonly RayTracingShader raytracingShader;
+        private TemporalAA.Settings taaSettings;
 
-		var computeShader = Resources.Load<ComputeShader>("PostProcessing/DepthOfField");
-		var tempId = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
-
-        var cameraTarget = renderGraph.GetRtHandleData<CameraTarget>().handle;
-        using (var pass = renderGraph.AddGenericRenderPass("Generate Scene Color Mips", cameraTarget))
+        public DepthOfField(Settings settings, LensSettings lensSettings, RenderGraph renderGraph, TemporalAA.Settings taaSettings) : base(renderGraph)
         {
-            pass.WriteTexture(cameraTarget);
-            pass.ReadTexture("", cameraTarget);
-            pass.SetRenderFunction(static (command, pass, cameraTarget) =>
-            {
-                command.GenerateMips(pass.GetRenderTexture(cameraTarget));
-            });
+            this.settings = settings;
+            this.lensSettings = lensSettings;
+            this.taaSettings = taaSettings;
+
+            material = new Material(Shader.Find("Hidden/Depth of Field")) { hideFlags = HideFlags.HideAndDontSave };
+            raytracingShader = Resources.Load<RayTracingShader>("Raytracing/DepthOfField");
         }
 
-		if (settings.UseRaytracing)
-		{
-			// Need to set some things as globals so that hit shaders can access them..
-			using (var pass = renderGraph.AddGenericRenderPass("Depth of Field Raytrace Setup"))
-			{
-                pass.PreventNewSubPass = true;
-                pass.ReadResource<SkyReflectionAmbientData>();
-				pass.ReadResource<LightingSetup.Result>();
-				pass.ReadResource<AutoExposureData>();
-				pass.ReadResource<AtmospherePropertiesAndTables>();
-			    pass.ReadResource<TerrainFrameData>(true);
-				pass.ReadResource<TerrainViewData>(true);
-				pass.ReadResource<CloudShadowDataResult>();
-				pass.ReadResource<ShadowData>();
-				pass.ReadResource<ViewData>();
-				pass.ReadResource<FrameData>();
-			}
+        public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+        {
+            if (!settings.IsEnabled)
+                return;
 
-			using (var pass = renderGraph.AddRaytracingRenderPass("Depth of Field", 
-			(
-				viewPassData.focalDistance,
-                viewPassData.apertureRadius,
-				settings.SampleCount,
-				taaSettings.IsEnabled ? 1.0f : 0.0f
-			)))
-			{
-				var raytracingData = renderGraph.GetResource<RaytracingResult>();
+            var computeShader = Resources.Load<ComputeShader>("PostProcessing/DepthOfField");
+            var tempId = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 
-				pass.Initialize(raytracingShader, "RayGeneration", "Raytracing", raytracingData.Rtas, viewPassData.viewSize.x, viewPassData.viewSize.y, 1, raytracingData.Bias, raytracingData.DistantBias, viewPassData.tanHalfFov.y);
-                pass.PreventNewSubPass = true;
-                pass.WriteTexture(tempId, "HitColor");
-				//pass.WriteTexture(hitResult, "HitResult");
+            var cameraTarget = renderGraph.GetRtHandleData<CameraTarget>().handle;
+            using (var pass = renderGraph.AddGenericRenderPass("Generate Scene Color Mips", cameraTarget))
+            {
+                pass.WriteTexture(cameraTarget);
+                pass.ReadTexture("", cameraTarget);
+                pass.SetRenderFunction(static (command, pass, cameraTarget) =>
+                {
+                    command.GenerateMips(pass.GetRenderTexture(cameraTarget));
+                });
+            }
 
-				pass.ReadResource<AtmospherePropertiesAndTables>();
-				pass.ReadRtHandle<CameraDepth>();
-				pass.ReadResource<ViewData>();
-				pass.ReadResource<FrameData>();
-			    pass.ReadResource<TerrainFrameData>(true);
-				pass.ReadResource<TerrainViewData>(true);
+            if (settings.UseRaytracing)
+            {
+                // Need to set some things as globals so that hit shaders can access them..
+                using (var pass = renderGraph.AddGenericRenderPass("Depth of Field Raytrace Setup"))
+                {
+                    pass.PreventNewSubPass = true;
+                    pass.ReadResource<SkyReflectionAmbientData>();
+                    pass.ReadResource<LightingSetup.Result>();
+                    pass.ReadResource<AutoExposureData>();
+                    pass.ReadResource<AtmospherePropertiesAndTables>();
+                    pass.ReadResource<TerrainFrameData>(true);
+                    pass.ReadResource<TerrainViewData>(true);
+                    pass.ReadResource<CloudShadowDataResult>();
+                    pass.ReadResource<ShadowData>();
+                    pass.ReadResource<ViewData>();
+                    pass.ReadResource<FrameData>();
+                }
 
-                pass.SetRenderFunction(static (command, pass, data) =>
-				{
-					pass.SetFloat("_FocusDistance", data.focalDistance);
-					pass.SetFloat("_ApertureRadius", data.apertureRadius);
-					pass.SetFloat("_SampleCount", data.SampleCount);
-					pass.SetFloat("_TaaEnabled", data.Item4);
-				});
-			}
-		}
-		else
-		{
-			using (var pass = renderGraph.AddFullscreenRenderPass("Depth of Field", 
-			(
-                viewPassData.focalDistance,
-                viewPassData.apertureRadius,
-				settings.SampleCount,
-				taaSettings.IsEnabled ? 1.0f : 0.0f,
-				viewPassData.viewSize
-			)))
-			{
-				pass.Initialize(material, viewPassData.viewSize, viewPassData.viewCount, isScreenPass: true);
-                pass.PreventNewSubPass = true;
-				pass.WriteTexture(tempId);
+                using (var pass = renderGraph.AddRaytracingRenderPass("Depth of Field",
+                (
+                    viewPassData.focalDistance,
+                    viewPassData.apertureRadius,
+                    settings.SampleCount,
+                    taaSettings.IsEnabled ? 1.0f : 0.0f
+                )))
+                {
+                    var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
-				pass.ReadRtHandle<CameraTarget>();
-				pass.ReadRtHandle<CameraDepth>();
-				pass.ReadRtHandle<HiZMinDepth>();
-				pass.ReadResource<FrameData>();
-				pass.ReadResource<ViewData>();
-                pass.ReadRtHandle<CameraVelocity>();
+                    pass.Initialize(raytracingShader, "RayGeneration", "Raytracing", raytracingData.Rtas, viewPassData.viewSize.x, viewPassData.viewSize.y, 1, raytracingData.Bias, raytracingData.DistantBias, viewPassData.tanHalfFov.y);
+                    pass.PreventNewSubPass = true;
+                    pass.WriteTexture(tempId, "HitColor");
+                    //pass.WriteTexture(hitResult, "HitResult");
 
-                pass.SetRenderFunction(static (command, pass, data) =>
-				{
-					pass.SetFloat("_FocusDistance", data.focalDistance);
-					pass.SetFloat("_ApertureRadius", data.apertureRadius);
-					pass.SetFloat("_SampleCount", data.SampleCount);
-					pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(data.viewSize) - 1);
-					pass.SetFloat("_TaaEnabled", data.Item4);
-				});
-			}
-		}
+                    pass.ReadResource<AtmospherePropertiesAndTables>();
+                    pass.ReadRtHandle<CameraDepth>();
+                    pass.ReadResource<ViewData>();
+                    pass.ReadResource<FrameData>();
+                    pass.ReadResource<TerrainFrameData>(true);
+                    pass.ReadResource<TerrainViewData>(true);
 
-		renderGraph.SetRTHandle<CameraTarget>(tempId);
-	}
+                    pass.SetRenderFunction(static (command, pass, data) =>
+                    {
+                        pass.SetFloat("_FocusDistance", data.focalDistance);
+                        pass.SetFloat("_ApertureRadius", data.apertureRadius);
+                        pass.SetFloat("_SampleCount", data.SampleCount);
+                        pass.SetFloat("_TaaEnabled", data.Item4);
+                    });
+                }
+            }
+            else
+            {
+                using (var pass = renderGraph.AddFullscreenRenderPass("Depth of Field",
+                (
+                    viewPassData.focalDistance,
+                    viewPassData.apertureRadius,
+                    settings.SampleCount,
+                    taaSettings.IsEnabled ? 1.0f : 0.0f,
+                    viewPassData.viewSize
+                )))
+                {
+                    pass.Initialize(material, viewPassData.viewSize, viewPassData.viewCount, isScreenPass: true);
+                    pass.PreventNewSubPass = true;
+                    pass.WriteTexture(tempId);
+
+                    pass.ReadRtHandle<CameraTarget>();
+                    pass.ReadRtHandle<CameraDepth>();
+                    pass.ReadRtHandle<HiZMinDepth>();
+                    pass.ReadResource<FrameData>();
+                    pass.ReadResource<ViewData>();
+                    pass.ReadRtHandle<CameraVelocity>();
+
+                    pass.SetRenderFunction(static (command, pass, data) =>
+                    {
+                        pass.SetFloat("_FocusDistance", data.focalDistance);
+                        pass.SetFloat("_ApertureRadius", data.apertureRadius);
+                        pass.SetFloat("_SampleCount", data.SampleCount);
+                        pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(data.viewSize) - 1);
+                        pass.SetFloat("_TaaEnabled", data.Item4);
+                    });
+                }
+            }
+
+            renderGraph.SetRTHandle<CameraTarget>(tempId);
+        }
+    }
 }

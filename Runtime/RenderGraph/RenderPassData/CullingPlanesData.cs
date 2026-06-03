@@ -1,16 +1,19 @@
 ﻿using UnityEngine.Rendering;
 
-public readonly struct CullingPlanesData : IRenderPassData
+namespace CustomRenderPipeline
 {
-	public readonly CullingPlanes cullingPlanes;
+    public readonly struct CullingPlanesData : IRenderPassData
+    {
+        public readonly CullingPlanes cullingPlanes;
 
-	public CullingPlanesData(CullingPlanes cullingPlanes) => this.cullingPlanes = cullingPlanes;
+        public CullingPlanesData(CullingPlanes cullingPlanes) => this.cullingPlanes = cullingPlanes;
 
-	void IRenderPassData.SetInputs(RenderPass pass)
-	{
-	}
+        void IRenderPassData.SetInputs(RenderPass pass)
+        {
+        }
 
-	void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
-	{
-	}
+        void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
+        {
+        }
+    }
 }

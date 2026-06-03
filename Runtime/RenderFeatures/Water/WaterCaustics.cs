@@ -5,84 +5,87 @@ using UnityEngine.Rendering;
 using Unmath;
 using static Unmath.Math;
 
-public class WaterCaustics : ViewRenderFeature
+namespace CustomRenderPipeline
 {
-	private readonly WaterSettings settings;
-	private readonly Material material;
-	private readonly ResourceHandle<GraphicsBuffer> indexBuffer;
-
-	public WaterCaustics(RenderGraph renderGraph, WaterSettings settings) : base(renderGraph)
-	{
-		this.settings = settings;
-		material = new Material(Shader.Find("Hidden/Water Caustics")) { hideFlags = HideFlags.HideAndDontSave };
-		indexBuffer = renderGraph.GetGridIndexBuffer(128, false, false, true);
-	}
-
-	protected override void Cleanup(bool disposing)
-	{
-		renderGraph.ReleasePersistentResource(indexBuffer, -1);
-	}
-
-	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+    public class WaterCaustics : ViewRenderFeature
     {
-		if (!settings.IsEnabled)
-			return;
+        private readonly WaterSettings settings;
+        private readonly Material material;
+        private readonly ResourceHandle<GraphicsBuffer> indexBuffer;
 
-		using var scope = renderGraph.AddProfileScope("Water Caustics");
+        public WaterCaustics(RenderGraph renderGraph, WaterSettings settings) : base(renderGraph)
+        {
+            this.settings = settings;
+            material = new Material(Shader.Find("Hidden/Water Caustics")) { hideFlags = HideFlags.HideAndDontSave };
+            indexBuffer = renderGraph.GetGridIndexBuffer(128, false, false, true);
+        }
 
-		var Profile = settings.Profile;
-		var patchSizes = new Vector4(Profile.PatchSize / Pow(Profile.CascadeScale, 0f), Profile.PatchSize / Pow(Profile.CascadeScale, 1f), Profile.PatchSize / Pow(Profile.CascadeScale, 2f), Profile.PatchSize / Pow(Profile.CascadeScale, 3f));
-		var patchSize = patchSizes[settings.CasuticsCascade];
+        protected override void Cleanup(bool disposing)
+        {
+            renderGraph.ReleasePersistentResource(indexBuffer, -1);
+        }
 
-		var temp0 = renderGraph.GetTexture(129, GraphicsFormat.R16G16B16A16_SFloat, isExactSize: true);
-		using (var pass = renderGraph.AddFullscreenRenderPass("Ocean Caustics Prepare", (settings.CausticsDepth, settings.CasuticsCascade, patchSize)))
-		{
-			pass.Initialize(material, 129, 1, 2);
-			pass.WriteTexture(temp0);
-			pass.ReadResource<LightingData>();
-			pass.ReadResource<OceanFftResult>();
+        public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+        {
+            if (!settings.IsEnabled)
+                return;
 
-			pass.SetRenderFunction(static (command, pass, data) =>
-			{
-				pass.SetFloat("_CausticsDepth", data.CausticsDepth);
-				pass.SetFloat("_CausticsCascade", data.CasuticsCascade);
-				pass.SetFloat("_PatchSize", data.patchSize);
-				pass.SetVector("_RefractiveIndex", Float3.One * (1.0f / 1.34f));
-			});
-		}
+            using var scope = renderGraph.AddProfileScope("Water Caustics");
 
-		var tempResult = renderGraph.GetTexture(settings.CasuticsResolution * 2, GraphicsFormat.B10G11R11_UFloatPack32, isExactSize: true, clear: true);
-		using (var pass = renderGraph.AddDrawProceduralIndexedRenderPass("Ocean Caustics Render", (patchSize, settings.CausticsDepth, settings.CasuticsCascade)))
-		{
-			pass.Initialize(indexBuffer, material, Matrix4x4.identity, settings.CasuticsResolution * 2, 1, 0);
+            var Profile = settings.Profile;
+            var patchSizes = new Vector4(Profile.PatchSize / Pow(Profile.CascadeScale, 0f), Profile.PatchSize / Pow(Profile.CascadeScale, 1f), Profile.PatchSize / Pow(Profile.CascadeScale, 2f), Profile.PatchSize / Pow(Profile.CascadeScale, 3f));
+            var patchSize = patchSizes[settings.CasuticsCascade];
 
-			pass.WriteTexture(tempResult);
+            var temp0 = renderGraph.GetTexture(129, GraphicsFormat.R16G16B16A16_SFloat, isExactSize: true);
+            using (var pass = renderGraph.AddFullscreenRenderPass("Ocean Caustics Prepare", (settings.CausticsDepth, settings.CasuticsCascade, patchSize)))
+            {
+                pass.Initialize(material, 129, 1, 2);
+                pass.WriteTexture(temp0);
+                pass.ReadResource<LightingData>();
+                pass.ReadResource<OceanFftResult>();
 
-			pass.ReadResource<LightingData>();
-			pass.ReadResource<OceanFftResult>();
-			pass.ReadTexture("_Input", temp0);
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    pass.SetFloat("_CausticsDepth", data.CausticsDepth);
+                    pass.SetFloat("_CausticsCascade", data.CasuticsCascade);
+                    pass.SetFloat("_PatchSize", data.patchSize);
+                    pass.SetVector("_RefractiveIndex", Float3.One * (1.0f / 1.34f));
+                });
+            }
 
-			pass.SetRenderFunction(static (command, pass, data) =>
-			{
-				var viewMatrix = Matrix4x4.LookAt(Vector3.zero, Vector3.down, Vector3.forward).inverse;
-				var projectionMatrix = Matrix4x4.Ortho(-data.patchSize, data.patchSize, -data.patchSize, data.patchSize, 0, data.CausticsDepth * 2);
-				command.SetViewProjectionMatrices(viewMatrix, projectionMatrix);
+            var tempResult = renderGraph.GetTexture(settings.CasuticsResolution * 2, GraphicsFormat.B10G11R11_UFloatPack32, isExactSize: true, clear: true);
+            using (var pass = renderGraph.AddDrawProceduralIndexedRenderPass("Ocean Caustics Render", (patchSize, settings.CausticsDepth, settings.CasuticsCascade)))
+            {
+                pass.Initialize(indexBuffer, material, Matrix4x4.identity, settings.CasuticsResolution * 2, 1, 0);
 
-				pass.SetFloat("_CausticsDepth", data.CausticsDepth);
-				pass.SetFloat("_CausticsCascade", data.CasuticsCascade);
-				pass.SetFloat("_PatchSize", data.patchSize);
-				pass.SetVector("_RefractiveIndex", Float3.One * (1.0f / 1.34f));
-			});
-		}
+                pass.WriteTexture(tempResult);
 
-		var result = renderGraph.GetTexture(settings.CasuticsResolution, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true, autoGenerateMips: true, isExactSize: true);
-		using (var pass = renderGraph.AddFullscreenRenderPass("Ocean Caustics Blit"))
-		{
-			pass.Initialize(material, settings.CasuticsResolution, 1, 1);
-			pass.ReadTexture("_MainTex", tempResult);
-			pass.WriteTexture(result);
-		}
+                pass.ReadResource<LightingData>();
+                pass.ReadResource<OceanFftResult>();
+                pass.ReadTexture("_Input", temp0);
 
-		renderGraph.SetResource(new CausticsResult(result, settings.CasuticsCascade, settings.CausticsDepth));
-	}
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    var viewMatrix = Matrix4x4.LookAt(Vector3.zero, Vector3.down, Vector3.forward).inverse;
+                    var projectionMatrix = Matrix4x4.Ortho(-data.patchSize, data.patchSize, -data.patchSize, data.patchSize, 0, data.CausticsDepth * 2);
+                    command.SetViewProjectionMatrices(viewMatrix, projectionMatrix);
+
+                    pass.SetFloat("_CausticsDepth", data.CausticsDepth);
+                    pass.SetFloat("_CausticsCascade", data.CasuticsCascade);
+                    pass.SetFloat("_PatchSize", data.patchSize);
+                    pass.SetVector("_RefractiveIndex", Float3.One * (1.0f / 1.34f));
+                });
+            }
+
+            var result = renderGraph.GetTexture(settings.CasuticsResolution, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true, autoGenerateMips: true, isExactSize: true);
+            using (var pass = renderGraph.AddFullscreenRenderPass("Ocean Caustics Blit"))
+            {
+                pass.Initialize(material, settings.CasuticsResolution, 1, 1);
+                pass.ReadTexture("_MainTex", tempResult);
+                pass.WriteTexture(result);
+            }
+
+            renderGraph.SetResource(new CausticsResult(result, settings.CasuticsCascade, settings.CausticsDepth));
+        }
+    }
 }

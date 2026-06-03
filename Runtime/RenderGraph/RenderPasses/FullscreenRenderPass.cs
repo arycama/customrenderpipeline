@@ -2,80 +2,83 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using Unmath;
 
-public class FullscreenRenderPass<T> : DrawRenderPass<T>
+namespace CustomRenderPipeline
 {
-    private Material material;
-    private int passIndex;
-    private int primitiveCount;
-    private SinglePassStereoMode stereoMode;
-
-    public override string ToString()
+    public class FullscreenRenderPass<T> : DrawRenderPass<T>
     {
-        return $"{Name} {material} {passIndex}";
-    }
+        private Material material;
+        private int passIndex;
+        private int primitiveCount;
+        private SinglePassStereoMode stereoMode;
 
-    public virtual void Initialize(Material material, Int2 size, int viewCount = 1, int passIndex = 0, int primitiveCount = 1, SinglePassStereoMode stereoMode = SinglePassStereoMode.None, int antiAliasing = 1, bool isScreenPass = false)
-    {
-        this.material = material;
-        this.passIndex = passIndex;
-        this.primitiveCount = primitiveCount;
-        this.stereoMode = stereoMode;
-        AntiAliasing = antiAliasing;
-        Size = size;
-        ViewCount = viewCount;
-        IsScreenPass = isScreenPass;
-    }
-
-    public override void Reset()
-    {
-        base.Reset();
-        material = null;
-        passIndex = 0;
-        primitiveCount = 1;
-    }
-
-    protected override void Execute()
-    {
-        foreach (var keyword in keywords)
-            Command.EnableShaderKeyword(keyword);
-
-        int instanceMultiplier;
-        if (stereoMode == SinglePassStereoMode.Instancing)
+        public override string ToString()
         {
-            Command.EnableShaderKeyword("STEREO_INSTANCING_ON");
-            Command.SetSinglePassStereo(SinglePassStereoMode.Instancing);
-            instanceMultiplier = 2;
+            return $"{Name} {material} {passIndex}";
         }
-        else
+
+        public virtual void Initialize(Material material, Int2 size, int viewCount = 1, int passIndex = 0, int primitiveCount = 1, SinglePassStereoMode stereoMode = SinglePassStereoMode.None, int antiAliasing = 1, bool isScreenPass = false)
         {
-            instanceMultiplier = 1;
-            if (stereoMode == SinglePassStereoMode.Multiview)
+            this.material = material;
+            this.passIndex = passIndex;
+            this.primitiveCount = primitiveCount;
+            this.stereoMode = stereoMode;
+            AntiAliasing = antiAliasing;
+            Size = size;
+            ViewCount = viewCount;
+            IsScreenPass = isScreenPass;
+        }
+
+        public override void Reset()
+        {
+            base.Reset();
+            material = null;
+            passIndex = 0;
+            primitiveCount = 1;
+        }
+
+        protected override void Execute()
+        {
+            foreach (var keyword in keywords)
+                Command.EnableShaderKeyword(keyword);
+
+            int instanceMultiplier;
+            if (stereoMode == SinglePassStereoMode.Instancing)
             {
-                Command.EnableShaderKeyword("STEREO_MULTIVIEW_ON");
-                Command.SetSinglePassStereo(SinglePassStereoMode.Multiview);
+                Command.EnableShaderKeyword("STEREO_INSTANCING_ON");
+                Command.SetSinglePassStereo(SinglePassStereoMode.Instancing);
+                instanceMultiplier = 2;
             }
+            else
+            {
+                instanceMultiplier = 1;
+                if (stereoMode == SinglePassStereoMode.Multiview)
+                {
+                    Command.EnableShaderKeyword("STEREO_MULTIVIEW_ON");
+                    Command.SetSinglePassStereo(SinglePassStereoMode.Multiview);
+                }
+            }
+
+            if (RenderGraph.IsCullingCcw)
+                Command.EnableShaderKeyword("FLIP");
+
+            Command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, 3 * primitiveCount * instanceMultiplier, 1, PropertyBlock);
+
+            if (RenderGraph.IsCullingCcw)
+                Command.DisableShaderKeyword("FLIP");
+
+            if (stereoMode == SinglePassStereoMode.Instancing)
+            {
+                Command.SetSinglePassStereo(SinglePassStereoMode.None);
+                Command.DisableShaderKeyword("STEREO_INSTANCING_ON");
+            }
+            else if (stereoMode == SinglePassStereoMode.Multiview)
+            {
+                Command.SetSinglePassStereo(SinglePassStereoMode.None);
+                Command.DisableShaderKeyword("STEREO_MULTIVIEW_ON");
+            }
+
+            foreach (var keyword in keywords)
+                Command.DisableShaderKeyword(keyword);
         }
-
-        if (RenderGraph.IsCullingCcw)
-            Command.EnableShaderKeyword("FLIP");
-
-        Command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, 3 * primitiveCount * instanceMultiplier, 1, PropertyBlock);
-
-        if (RenderGraph.IsCullingCcw)
-            Command.DisableShaderKeyword("FLIP");
-
-        if (stereoMode == SinglePassStereoMode.Instancing)
-        {
-            Command.SetSinglePassStereo(SinglePassStereoMode.None);
-            Command.DisableShaderKeyword("STEREO_INSTANCING_ON");
-        }
-        else if (stereoMode == SinglePassStereoMode.Multiview)
-        {
-            Command.SetSinglePassStereo(SinglePassStereoMode.None);
-            Command.DisableShaderKeyword("STEREO_MULTIVIEW_ON");
-        }
-
-        foreach (var keyword in keywords)
-            Command.DisableShaderKeyword(keyword);
     }
 }

@@ -2,47 +2,50 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using Unmath;
 
-public class DrawProceduralIndexedRenderPass<T> : DrawRenderPass<T>
+namespace CustomRenderPipeline
 {
-	private Material material;
-	private int passIndex;
-	private Float4x4 matrix;
-	private MeshTopology topology;
-	private ResourceHandle<GraphicsBuffer> indexBuffer;
+    public class DrawProceduralIndexedRenderPass<T> : DrawRenderPass<T>
+    {
+        private Material material;
+        private int passIndex;
+        private Float4x4 matrix;
+        private MeshTopology topology;
+        private ResourceHandle<GraphicsBuffer> indexBuffer;
 
-	public override string ToString()
-	{
-		return $"{Name} {material} {passIndex}";
-	}
+        public override string ToString()
+        {
+            return $"{Name} {material} {passIndex}";
+        }
 
-	public void Initialize(ResourceHandle<GraphicsBuffer> indexBuffer, Material material, Float4x4 matrix, Int2 size, int viewCount = 1, int passIndex = 0, MeshTopology topology = MeshTopology.Triangles)
-	{
-		this.material = material;
-		this.passIndex = passIndex;
-		this.matrix = matrix;
-		this.topology = topology;
-		this.indexBuffer = indexBuffer;
-        Size = size;
-        ViewCount = viewCount;
-	}
+        public void Initialize(ResourceHandle<GraphicsBuffer> indexBuffer, Material material, Float4x4 matrix, Int2 size, int viewCount = 1, int passIndex = 0, MeshTopology topology = MeshTopology.Triangles)
+        {
+            this.material = material;
+            this.passIndex = passIndex;
+            this.matrix = matrix;
+            this.topology = topology;
+            this.indexBuffer = indexBuffer;
+            Size = size;
+            ViewCount = viewCount;
+        }
 
-	public override void Reset()
-	{
-		base.Reset();
-		material = null;
-		passIndex = 0;
-		matrix = default;
-	}
+        public override void Reset()
+        {
+            base.Reset();
+            material = null;
+            passIndex = 0;
+            matrix = default;
+        }
 
-	protected override void Execute()
-	{
-		foreach (var keyword in keywords)
-			Command.EnableKeyword(material, new LocalKeyword(material.shader, keyword));
+        protected override void Execute()
+        {
+            foreach (var keyword in keywords)
+                Command.EnableKeyword(material, new LocalKeyword(material.shader, keyword));
 
-		var indices = GetBuffer(indexBuffer);
-		Command.DrawProcedural(indices, matrix, material, passIndex, topology, indices.count, 1, PropertyBlock);
+            var indices = GetBuffer(indexBuffer);
+            Command.DrawProcedural(indices, matrix, material, passIndex, topology, indices.count, 1, PropertyBlock);
 
-		foreach (var keyword in keywords)
-			Command.DisableKeyword(material, new LocalKeyword(material.shader, keyword));
-	}
+            foreach (var keyword in keywords)
+                Command.DisableKeyword(material, new LocalKeyword(material.shader, keyword));
+        }
+    }
 }

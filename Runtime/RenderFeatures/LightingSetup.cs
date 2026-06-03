@@ -8,378 +8,381 @@ using Unmath;
 using static Unmath.Math;
 using Quaternion = Unmath.Quaternion;
 
-public partial class LightingSetup : ViewRenderFeature
+namespace CustomRenderPipeline
 {
-	private readonly LightingSettings settings;
-    private readonly NativeList<LightShadowCasterCullingInfo> perLightInfos = new(1, Allocator.Persistent);
-    private readonly NativeList<ShadowSplitData> splitBuffer = new(1, Allocator.Persistent);
-
-    public LightingSetup(RenderGraph renderGraph, LightingSettings settings) : base(renderGraph)
-	{
-		this.settings = settings;
-	}
-
-    protected override void Cleanup(bool disposing)
+    public partial class LightingSetup : ViewRenderFeature
     {
-        perLightInfos.Dispose();
-        splitBuffer.Dispose();
-    }
+        private readonly LightingSettings settings;
+        private readonly NativeList<LightShadowCasterCullingInfo> perLightInfos = new(1, Allocator.Persistent);
+        private readonly NativeList<ShadowSplitData> splitBuffer = new(1, Allocator.Persistent);
 
-    public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
-    {
-		var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
-		var directionalShadowRequests = ListPool<ShadowRequest>.Get();
-		var pointShadowRequests = ListPool<ShadowRequest>.Get();
-		var spotShadowRequests = ListPool<ShadowRequest>.Get();
-		var lightList = ListPool<LightData>.Get();
-		var directionalShadowMatrices = ListPool<Float3x4>.Get();
-		var directionalCascadeSizes = ListPool<Float4>.Get();
+        public LightingSetup(RenderGraph renderGraph, LightingSettings settings) : base(renderGraph)
+        {
+            this.settings = settings;
+        }
 
-        // Find first 2 directional lights
-        Float3 lightColor0 = Float3.Zero, lightColor1 = Float3.Zero;
-        Quaternion lightRotation0 = Quaternion.Identity, lightRotation1 = Quaternion.Identity;
-		var dirLightCount = 0;
+        protected override void Cleanup(bool disposing)
+        {
+            perLightInfos.Dispose();
+            splitBuffer.Dispose();
+        }
 
-		var n = viewPassData.near;
-		var f = settings.DirectionalShadowDistance;
-		var m = (float)settings.DirectionalCascadeCount;
-		var c = Pow(Max(1e-3f, settings.CascadeUniformity), 2.2f);
+        public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+        {
+            var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
+            var directionalShadowRequests = ListPool<ShadowRequest>.Get();
+            var pointShadowRequests = ListPool<ShadowRequest>.Get();
+            var spotShadowRequests = ListPool<ShadowRequest>.Get();
+            var lightList = ListPool<LightData>.Get();
+            var directionalShadowMatrices = ListPool<Float3x4>.Get();
+            var directionalCascadeSizes = ListPool<Float4>.Get();
 
-        perLightInfos.Clear();
-        splitBuffer.Clear();
+            // Find first 2 directional lights
+            Float3 lightColor0 = Float3.Zero, lightColor1 = Float3.Zero;
+            Quaternion lightRotation0 = Quaternion.Identity, lightRotation1 = Quaternion.Identity;
+            var dirLightCount = 0;
 
-        for (var i = 0; i < cullingResults.visibleLights.Length; i++)
-		{
-            var visibleLight = cullingResults.visibleLights[i];
-            var lightToWorld = (Float4x4)visibleLight.localToWorldMatrix;
-            var lightPosition = lightToWorld.Translation;
-            var lightRotation = lightToWorld.Rotation;
+            var n = viewPassData.near;
+            var f = settings.DirectionalShadowDistance;
+            var m = (float)settings.DirectionalCascadeCount;
+            var c = Pow(Max(1e-3f, settings.CascadeUniformity), 2.2f);
 
-            if (visibleLight.lightType == LightType.Directional)
+            perLightInfos.Clear();
+            splitBuffer.Clear();
+
+            for (var i = 0; i < cullingResults.visibleLights.Length; i++)
             {
-                dirLightCount++;
-                if (dirLightCount == 1)
-                {
-                    lightRotation0 = lightRotation;
-                    lightColor0 = ColorspaceUtility.Rec709ToRec2020(visibleLight.finalColor.Float3());
+                var visibleLight = cullingResults.visibleLights[i];
+                var lightToWorld = (Float4x4)visibleLight.localToWorldMatrix;
+                var lightPosition = lightToWorld.Translation;
+                var lightRotation = lightToWorld.Rotation;
 
-                    #if UNITY_EDITOR
+                if (visibleLight.lightType == LightType.Directional)
+                {
+                    dirLightCount++;
+                    if (dirLightCount == 1)
+                    {
+                        lightRotation0 = lightRotation;
+                        lightColor0 = ColorspaceUtility.Rec709ToRec2020(visibleLight.finalColor.Float3());
+
+#if UNITY_EDITOR
                         // The default scene light only has an intensity of 1, set it to sun
                         if (viewPassData.cameraType == CameraType.SceneView && !UnityEditor.SceneView.currentDrawingSceneView.sceneLighting || viewPassData.cameraType == CameraType.Preview)
                             lightColor0 *= 120000;
-                    #endif
+#endif
+                    }
+                    else if (dirLightCount < 3)
+                    {
+                        lightRotation1 = lightRotation;
+                        lightColor1 = ColorspaceUtility.Rec709ToRec2020(visibleLight.finalColor.Float3());
+                    }
                 }
-                else if (dirLightCount < 3)
+
+                // TODO: May need adjusting for spot lights?
+                var angleScale = 0f;
+                var angleOffset = 1f;
+                var light = visibleLight.light;
+                var shadowIndex = uint.MaxValue;
+
+                BatchCullingProjectionType projectionType;
+                ushort splitExclusionMask = 0;
+                var splitRange = new RangeInt(0, 0);
+
+                var size = light.areaSize;
+                if (light.shadows != LightShadows.None)
                 {
-                    lightRotation1 = lightRotation;
-                    lightColor1 = ColorspaceUtility.Rec709ToRec2020(visibleLight.finalColor.Float3());
-                }
-            }
+                    var hasShadowBounds = cullingResults.GetShadowCasterBounds(i, out var shadowCasterBounds);
 
-            // TODO: May need adjusting for spot lights?
-            var angleScale = 0f;
-            var angleOffset = 1f;
-            var light = visibleLight.light;
-            var shadowIndex = uint.MaxValue;
+                    if (light.type == LightType.Directional)
+                    {
+                        // ref https://developer.nvidia.com/gpugems/gpugems3/part-ii-light-and-shadows/chapter-10-parallel-split-shadow-maps-programmable-gpus
+                        var worldToView = Float4x4.Rotate(lightRotation.Inverse);
+                        var cameraToWorld = Float4x4.TRS(viewPassData.position, viewPassData.rotation, 1);
+                        var cameraToView = worldToView.Mul(cameraToWorld);
 
-            BatchCullingProjectionType projectionType;
-            ushort splitExclusionMask = 0;
-            var splitRange = new RangeInt(0, 0);
+                        float GetFrustumDepth(int j)
+                        {
+                            var L = Rcp(c);
+                            var M = Log2(c * (f - n) + 1);
+                            var N = n - Rcp(c);
+                            var x = j / m;
+                            return L * Exp2(M * x) + N;
+                        }
 
-            var size = light.areaSize;
-			if (light.shadows != LightShadows.None)
-			{
-				var hasShadowBounds = cullingResults.GetShadowCasterBounds(i, out var shadowCasterBounds);
+                        splitRange = new RangeInt(splitBuffer.Length, settings.DirectionalCascadeCount);
+                        for (var j = 0; j < settings.DirectionalCascadeCount; j++)
+                        {
+                            // Transform camera split bounds to light space
+                            var near = GetFrustumDepth(j);
+                            var far = GetFrustumDepth(j + 1);
 
-				if (light.type == LightType.Directional)
-				{
-                    // ref https://developer.nvidia.com/gpugems/gpugems3/part-ii-light-and-shadows/chapter-10-parallel-split-shadow-maps-programmable-gpus
-                    var worldToView = Float4x4.Rotate(lightRotation.Inverse);
-                    var cameraToWorld = Float4x4.TRS(viewPassData.position, viewPassData.rotation, 1);
-                    var cameraToView = worldToView.Mul(cameraToWorld);
+                            // TODO: Can this be done in camera relative space to simplify, since we need the final viewProj matrix in camera relative space anyway? Though culling planes need to be in world space
+                            var viewBounds = Geometry.GetFrustumBounds(viewPassData.tanHalfFov, near, far, cameraToView);
+                            var viewToClip = Float4x4.OrthoReverseZ(-viewBounds.extents.x, viewBounds.extents.x, -viewBounds.extents.y, viewBounds.extents.y, 0, viewBounds.Size.z);
 
-					float GetFrustumDepth(int j)
-					{
-						var L = Rcp(c);
-						var M = Log2(c * (f - n) + 1);
-						var N = n - Rcp(c);
-						var x = j / m;
-						return L * Exp2(M * x) + N;
-					}
+                            var worldViewPosition = viewBounds.center;
+                            worldViewPosition.z = viewBounds.Min.z;
+                            worldViewPosition = lightToWorld.MultiplyPoint3x4(worldViewPosition);
 
-                    splitRange = new RangeInt(splitBuffer.Length, settings.DirectionalCascadeCount);
-                    for (var j = 0; j < settings.DirectionalCascadeCount; j++)
-					{
-						// Transform camera split bounds to light space
-						var near = GetFrustumDepth(j);
-						var far = GetFrustumDepth(j + 1);
+                            var worldToCascade = Float4x4.WorldToLocal(worldViewPosition, lightRotation);
 
-                        // TODO: Can this be done in camera relative space to simplify, since we need the final viewProj matrix in camera relative space anyway? Though culling planes need to be in world space
-                        var viewBounds = Geometry.GetFrustumBounds(viewPassData.tanHalfFov, near, far, cameraToView);
-                        var viewToClip = Float4x4.OrthoReverseZ(-viewBounds.extents.x, viewBounds.extents.x, -viewBounds.extents.y, viewBounds.extents.y, 0, viewBounds.Size.z);
+                            var shadowSplitData = CalculateShadowSplitData(viewToClip.Mul(worldToCascade), lightRotation.Forward, true);
 
-                        var worldViewPosition = viewBounds.center;
-						worldViewPosition.z = viewBounds.Min.z;
-                        worldViewPosition = lightToWorld.MultiplyPoint3x4(worldViewPosition);
+                            var cameraInverseTranslation = Float4x4.Translate(viewPassData.position);
+                            worldToCascade = worldToCascade.Mul(cameraInverseTranslation);
 
-                        var worldToCascade = Float4x4.WorldToLocal(worldViewPosition, lightRotation);
+                            directionalShadowRequests.Add(new(i, worldToCascade, viewToClip, shadowSplitData, -1, Float3.Zero, hasShadowBounds, 0, viewBounds.Size.z, worldViewPosition, lightRotation, viewBounds.Size.x, viewBounds.Size.y, settings.DirectionalShadowResolution));
+                            directionalShadowMatrices.Add((Float3x4)Float4x4.OrthoReverseZSample(-viewBounds.extents.x, viewBounds.extents.x, -viewBounds.extents.y, viewBounds.extents.y, 0, viewBounds.Size.z).Mul(worldToCascade));
 
-                        var shadowSplitData = CalculateShadowSplitData(viewToClip.Mul(worldToCascade), lightRotation.Forward, true);
+                            // Note it could be max(cascadeTexelSize * 0.5, but this means we'd get no anti-aliasing on the min filter size)
+                            var worldUnitsPerTexel = viewBounds.Size.xy / settings.DirectionalShadowResolution;
+                            var filterSize = Float2.Max(worldUnitsPerTexel, settings.DirectionalBlockerDistance * Radians(settings.SunAngularDiameter) * 0.5f);
+                            var filterRadius = Float2.Min(settings.DirectionalMaxFilterSize, Float2.Ceil(filterSize * settings.DirectionalShadowResolution * 0.5f));
+                            var rcpFilterSize = worldUnitsPerTexel / filterSize;
+                            directionalCascadeSizes.Add(new Float4(rcpFilterSize, filterRadius));
 
-                        var cameraInverseTranslation = Float4x4.Translate(viewPassData.position);
-                        worldToCascade = worldToCascade.Mul(cameraInverseTranslation);
+                            splitBuffer.Add(shadowSplitData);
+                        }
+                    }
 
-                        directionalShadowRequests.Add(new(i, worldToCascade, viewToClip, shadowSplitData, -1, Float3.Zero, hasShadowBounds, 0, viewBounds.Size.z, worldViewPosition, lightRotation, viewBounds.Size.x, viewBounds.Size.y, settings.DirectionalShadowResolution));
-						directionalShadowMatrices.Add((Float3x4)Float4x4.OrthoReverseZSample(-viewBounds.extents.x, viewBounds.extents.x, -viewBounds.extents.y, viewBounds.extents.y, 0, viewBounds.Size.z).Mul(worldToCascade));
+                    if (visibleLight.lightType == LightType.Point)
+                    {
+                        shadowIndex = (uint)pointShadowRequests.Count;
+                        splitRange = new RangeInt(splitBuffer.Length, 6);
 
-						// Note it could be max(cascadeTexelSize * 0.5, but this means we'd get no anti-aliasing on the min filter size)
-                        var worldUnitsPerTexel = viewBounds.Size.xy / settings.DirectionalShadowResolution;
-                        var filterSize = Float2.Max(worldUnitsPerTexel, settings.DirectionalBlockerDistance * Radians(settings.SunAngularDiameter) * 0.5f);
-						var filterRadius = Float2.Min(settings.DirectionalMaxFilterSize, Float2.Ceil(filterSize * settings.DirectionalShadowResolution * 0.5f));
-						var rcpFilterSize = worldUnitsPerTexel / filterSize;
-						directionalCascadeSizes.Add(new Float4(rcpFilterSize, filterRadius));
+                        for (var j = 0; j < 6; j++)
+                        {
+                            var forward = Float4x4.lookAtList[j];
+                            var rotation = Quaternion.LookRotation(forward, Float4x4.upVectorList[j]);
+                            var worldToView = Float4x4.WorldToLocal(lightPosition, rotation);
+                            var viewToClip = Float4x4.PerspectiveReverseZ(1, light.shadowNearPlane, light.range);
+                            var worldToClip = viewToClip.Mul(worldToView);
+                            var shadowSplitData = CalculateShadowSplitData(worldToClip, forward, false);
 
-                        splitBuffer.Add(shadowSplitData);
-					}
-                }
+                            // Convert to camera relative
+                            var cameraInverseTranslation = Float4x4.Translate(viewPassData.position);
+                            worldToView = worldToView.Mul(cameraInverseTranslation);
 
-				if (visibleLight.lightType == LightType.Point)
-				{
-					shadowIndex = (uint)pointShadowRequests.Count;
-                    splitRange = new RangeInt(splitBuffer.Length, 6);
+                            pointShadowRequests.Add(new(i, worldToView, viewToClip, shadowSplitData, j, lightPosition, hasShadowBounds, light.shadowNearPlane, light.range, lightPosition, lightRotation, 1, 1, settings.PointShadowResolution));
+                            splitBuffer.Add(shadowSplitData);
+                        }
+                    }
 
-                    for (var j = 0; j < 6; j++)
-					{
-                        var forward = Float4x4.lookAtList[j];
-						var rotation = Quaternion.LookRotation(forward, Float4x4.upVectorList[j]);
-						var worldToView = Float4x4.WorldToLocal(lightPosition, rotation);
-						var viewToClip = Float4x4.PerspectiveReverseZ(1, light.shadowNearPlane, light.range);
-						var worldToClip = viewToClip.Mul(worldToView);
-						var shadowSplitData = CalculateShadowSplitData(worldToClip, forward, false);
+                    // TODO: Box/Pyramid/Area/Disc
+                    if (visibleLight.lightType == LightType.Spot)
+                    {
+                        var worldToView = Float4x4.WorldToLocal(lightPosition, lightRotation);
+                        var viewToClip = Float4x4.PerspectiveReverseZ(Tan(0.5f * Radians(light.spotAngle)) * new Float2(1.0f, size.x / size.y), light.shadowNearPlane, light.range);
+                        var worldToClip = viewToClip.Mul(worldToView);
+                        var shadowSplitData = CalculateShadowSplitData(worldToClip, light.transform.forward, false);
 
                         // Convert to camera relative
                         var cameraInverseTranslation = Float4x4.Translate(viewPassData.position);
                         worldToView = worldToView.Mul(cameraInverseTranslation);
 
-						pointShadowRequests.Add(new(i, worldToView, viewToClip, shadowSplitData, j, lightPosition, hasShadowBounds, light.shadowNearPlane, light.range, lightPosition, lightRotation, 1, 1, settings.PointShadowResolution));
+                        shadowIndex = (uint)spotShadowRequests.Count;
+                        var shadowRequest = new ShadowRequest(i, worldToView, viewToClip, shadowSplitData, -1, lightPosition, hasShadowBounds, light.shadowNearPlane, light.range, lightPosition, lightRotation, light.spotAngle, size.x / size.y, settings.SpotShadowResolution);
+                        spotShadowRequests.Add(shadowRequest);
+
+                        splitRange = new RangeInt(splitBuffer.Length, 1);
                         splitBuffer.Add(shadowSplitData);
                     }
                 }
 
-                // TODO: Box/Pyramid/Area/Disc
-                if (visibleLight.lightType == LightType.Spot)
-				{
-                    var worldToView = Float4x4.WorldToLocal(lightPosition, lightRotation);
-					var viewToClip = Float4x4.PerspectiveReverseZ(Tan(0.5f * Radians(light.spotAngle)) * new Float2(1.0f, size.x / size.y), light.shadowNearPlane, light.range);
-					var worldToClip = viewToClip.Mul(worldToView);
-					var shadowSplitData = CalculateShadowSplitData(worldToClip, light.transform.forward, false);
-
-                    // Convert to camera relative
-                    var cameraInverseTranslation = Float4x4.Translate(viewPassData.position);
-                    worldToView = worldToView.Mul(cameraInverseTranslation);
-
-					shadowIndex = (uint)spotShadowRequests.Count;
-					var shadowRequest = new ShadowRequest(i, worldToView, viewToClip, shadowSplitData, -1, lightPosition, hasShadowBounds, light.shadowNearPlane, light.range, lightPosition, lightRotation, light.spotAngle, size.x / size.y, settings.SpotShadowResolution);
-					spotShadowRequests.Add(shadowRequest);
-
-                    splitRange = new RangeInt(splitBuffer.Length, 1);
-                    splitBuffer.Add(shadowSplitData);
+                switch (light.type)
+                {
+                    case LightType.Directional:
+                        projectionType = BatchCullingProjectionType.Orthographic;
+                        break;
+                    case LightType.Point:
+                        projectionType = BatchCullingProjectionType.Perspective;
+                        break;
+                    case LightType.Spot:
+                        var halfAngle = Radians(light.spotAngle) * 0.5f;
+                        var innerConePercent = light.innerSpotAngle / visibleLight.spotAngle;
+                        var cosSpotOuterHalfAngle = Saturate(Cos(halfAngle));
+                        var cosSpotInnerHalfAngle = Saturate(Cos(halfAngle * innerConePercent));
+                        angleScale = Rcp(Max(1e-4f, cosSpotInnerHalfAngle - cosSpotOuterHalfAngle));
+                        angleOffset = -cosSpotOuterHalfAngle * angleScale;
+                        size.x = size.y = Rcp(Tan(halfAngle));
+                        projectionType = BatchCullingProjectionType.Perspective;
+                        break;
+                    case LightType.Pyramid:
+                        projectionType = BatchCullingProjectionType.Perspective;
+                        break;
+                    case LightType.Box:
+                        projectionType = BatchCullingProjectionType.Orthographic;
+                        break;
+                    case LightType.Rectangle:
+                        projectionType = BatchCullingProjectionType.Perspective;
+                        break;
+                    case LightType.Tube:
+                        projectionType = BatchCullingProjectionType.Perspective;
+                        break;
+                    case LightType.Disc:
+                        projectionType = BatchCullingProjectionType.Perspective;
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(light.type));
                 }
+
+                var pointLightData = new LightData(
+                    lightToWorld.Translation - viewPassData.position,
+                    light.range,
+                    ColorspaceUtility.Rec709ToRec2020(visibleLight.finalColor.Float3()),
+                    (uint)light.type,
+                    lightToWorld.Right,
+                    angleScale,
+                    lightToWorld.Up,
+                    angleOffset,
+                    lightToWorld.Forward,
+                    shadowIndex,
+                    size,
+                    1.0f + light.range / (light.shadowNearPlane - light.range),
+                    light.shadowNearPlane * light.range / (light.range - light.shadowNearPlane));
+                lightList.Add(pointLightData);
+
+                var lightShadowCasterCullingInfo = new LightShadowCasterCullingInfo()
+                {
+                    projectionType = projectionType,
+                    splitExclusionMask = splitExclusionMask,
+                    splitRange = splitRange
+                };
+
+                perLightInfos.Add(lightShadowCasterCullingInfo);
             }
 
-			switch (light.type)
-			{
-				case LightType.Directional:
-                    projectionType = BatchCullingProjectionType.Orthographic;
-                    break;
-				case LightType.Point:
-                    projectionType = BatchCullingProjectionType.Perspective;
-                    break;
-				case LightType.Spot:
-					var halfAngle = Radians(light.spotAngle) * 0.5f;
-					var innerConePercent = light.innerSpotAngle / visibleLight.spotAngle;
-					var cosSpotOuterHalfAngle = Saturate(Cos(halfAngle));
-					var cosSpotInnerHalfAngle = Saturate(Cos(halfAngle * innerConePercent));
-					angleScale = Rcp(Max(1e-4f, cosSpotInnerHalfAngle - cosSpotOuterHalfAngle));
-					angleOffset = -cosSpotOuterHalfAngle * angleScale;
-					size.x = size.y = Rcp(Tan(halfAngle));
-                    projectionType = BatchCullingProjectionType.Perspective;
-                    break;
-				case LightType.Pyramid:
-                    projectionType = BatchCullingProjectionType.Perspective;
-                    break;
-				case LightType.Box:
-                    projectionType = BatchCullingProjectionType.Orthographic;
-                    break;
-				case LightType.Rectangle:
-                    projectionType = BatchCullingProjectionType.Perspective;
-                    break;
-				case LightType.Tube:
-                    projectionType = BatchCullingProjectionType.Perspective;
-                    break;
-				case LightType.Disc:
-                    projectionType = BatchCullingProjectionType.Perspective;
-                    break;
-				default:
-					throw new ArgumentOutOfRangeException(nameof(light.type));
-			}
-
-			var pointLightData = new LightData(
-				lightToWorld.Translation - viewPassData.position,
-				light.range,
-				ColorspaceUtility.Rec709ToRec2020(visibleLight.finalColor.Float3()),
-				(uint)light.type,
-				lightToWorld.Right,
-				angleScale,
-				lightToWorld.Up,
-				angleOffset,
-				lightToWorld.Forward,
-				shadowIndex,
-				size,
-				1.0f + light.range / (light.shadowNearPlane - light.range),
-				light.shadowNearPlane * light.range / (light.range - light.shadowNearPlane));
-			lightList.Add(pointLightData);
-
-            var lightShadowCasterCullingInfo = new LightShadowCasterCullingInfo()
+            var infos = new ShadowCastersCullingInfos()
             {
-                projectionType = projectionType,
-                splitExclusionMask = splitExclusionMask,
-                splitRange = splitRange
+                perLightInfos = perLightInfos.AsArray(),
+                splitBuffer = splitBuffer.AsArray()
             };
 
-            perLightInfos.Add(lightShadowCasterCullingInfo);
+            context.CullShadowCasters(cullingResults, infos);
+
+            // Set final matrices
+            var directionalShadowMatricesBuffer = renderGraph.GetBuffer(Max(1, directionalShadowMatrices.Count), UnsafeUtility.SizeOf<Float3x4>());
+            using (var pass = renderGraph.AddGenericRenderPass("Set Directional Shadow Matrices", (directionalShadowMatrices, directionalShadowMatricesBuffer)))
+            {
+                pass.WriteBuffer("", directionalShadowMatricesBuffer);
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    command.SetBufferData(pass.GetBuffer(data.directionalShadowMatricesBuffer), data.directionalShadowMatrices);
+                    ListPool<Float3x4>.Release(data.directionalShadowMatrices);
+                });
+            }
+
+            var directionalCascadeSizesBuffer = renderGraph.GetBuffer(Max(1, directionalCascadeSizes.Count), UnsafeUtility.SizeOf<Float4>());
+            using (var pass = renderGraph.AddGenericRenderPass("Set Directional Cascade Sizes", (directionalCascadeSizes, directionalCascadeSizesBuffer)))
+            {
+                pass.WriteBuffer("", directionalCascadeSizesBuffer);
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    command.SetBufferData(pass.GetBuffer(data.directionalCascadeSizesBuffer), data.directionalCascadeSizes);
+                    ListPool<Float4>.Release(data.directionalCascadeSizes);
+                });
+            }
+
+            // Decoding params
+            var F = m * Rcp(Log2(c * (f - n) + 1));
+            var E = Log2(c) * F;
+            var G = Rcp(c) - n;
+
+            var fadeScale = -Rcp(settings.DirectionalFadeLength);
+            var fadeOffset = settings.DirectionalShadowDistance * Rcp(settings.DirectionalFadeLength);
+
+            var lightingData = renderGraph.SetConstantBuffer(new LightingDataStruct
+            (
+                -lightRotation0.Forward,
+                directionalShadowRequests.Count,
+                lightColor0,
+                dirLightCount,
+                -lightRotation1.Forward,
+                settings.DirectionalMaxFilterSize,
+                lightColor1,
+                settings.DirectionalBlockerDistance,
+                new Float4(E, F, G, 0),
+                fadeScale,
+                fadeOffset,
+                settings.DirectionalShadowResolution,
+                Rcp(settings.DirectionalShadowResolution)
+            ));
+
+            renderGraph.SetResource(new LightingData(lightRotation0, lightColor0, lightRotation1, lightColor1, lightingData, directionalShadowMatricesBuffer, directionalCascadeSizesBuffer));
+
+            var pointLightBuffer = lightList.Count == 0 ? renderGraph.EmptyBuffer : renderGraph.GetBuffer(lightList.Count, UnsafeUtility.SizeOf<LightData>());
+            using (var pass = renderGraph.AddGenericRenderPass("Set Light Data", (lightList, pointLightBuffer)))
+            {
+                pass.WriteBuffer("", pointLightBuffer);
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    command.SetBufferData(pass.GetBuffer(data.pointLightBuffer), data.lightList);
+                    ListPool<LightData>.Release(data.lightList);
+                });
+            }
+
+            renderGraph.SetResource(new Result(pointLightBuffer, lightList.Count));
+            renderGraph.SetResource(new ShadowRequestsData(directionalShadowRequests, pointShadowRequests, spotShadowRequests));
         }
 
-        var infos = new ShadowCastersCullingInfos()
+        private ShadowSplitData CalculateShadowSplitData(Float4x4 viewProjectionMatrix, bool skipNearPlane)
         {
-            perLightInfos = perLightInfos.AsArray(),
-            splitBuffer = splitBuffer.AsArray()
-        };
+            var shadowSplitData = new ShadowSplitData() { shadowCascadeBlendCullingFactor = 1 };
+            for (var i = FrustumPlane.Left; i < FrustumPlane.Count; i++)
+            {
+                if (!skipNearPlane || i != FrustumPlane.Near)
+                    shadowSplitData.SetCullingPlane(shadowSplitData.cullingPlaneCount++, viewProjectionMatrix.GetFrustumPlane(i));
+            }
 
-        context.CullShadowCasters(cullingResults, infos);
+            return shadowSplitData;
+        }
 
-		// Set final matrices
-		var directionalShadowMatricesBuffer = renderGraph.GetBuffer(Max(1, directionalShadowMatrices.Count), UnsafeUtility.SizeOf<Float3x4>());
-		using (var pass = renderGraph.AddGenericRenderPass("Set Directional Shadow Matrices", (directionalShadowMatrices, directionalShadowMatricesBuffer)))
-		{
-			pass.WriteBuffer("", directionalShadowMatricesBuffer);
-			pass.SetRenderFunction(static (command, pass, data) =>
-			{
-				command.SetBufferData(pass.GetBuffer(data.directionalShadowMatricesBuffer), data.directionalShadowMatrices);
-				ListPool<Float3x4>.Release(data.directionalShadowMatrices);
-			});
-		}
+        /// <summary> Add any planes that face away from the light direction. This avoids rendering shadowcasters that can never cast a visible shadow </summary>
+        private ShadowSplitData CalculateShadowSplitData(Float4x4 viewProjectionMatrix, Float3 forward, bool skipNearPlane)
+        {
+            var shadowSplitData = CalculateShadowSplitData(viewProjectionMatrix, skipNearPlane);
+            for (var i = FrustumPlane.Left; i < FrustumPlane.Count; i++)
+            {
+                var plane = viewProjectionMatrix.GetFrustumPlane(i);
+                if (plane.xyz.Dot(forward) < 0.0f)
+                    shadowSplitData.SetCullingPlane(shadowSplitData.cullingPlaneCount++, plane);
+            }
 
-		var directionalCascadeSizesBuffer = renderGraph.GetBuffer(Max(1, directionalCascadeSizes.Count), UnsafeUtility.SizeOf<Float4>());
-		using (var pass = renderGraph.AddGenericRenderPass("Set Directional Cascade Sizes", (directionalCascadeSizes, directionalCascadeSizesBuffer)))
-		{
-			pass.WriteBuffer("", directionalCascadeSizesBuffer);
-			pass.SetRenderFunction(static (command, pass, data) =>
-			{
-				command.SetBufferData(pass.GetBuffer(data.directionalCascadeSizesBuffer), data.directionalCascadeSizes);
-				ListPool<Float4>.Release(data.directionalCascadeSizes);
-			});
-		}
+            return shadowSplitData;
+        }
+    }
 
-		// Decoding params
-		var F = m * Rcp(Log2(c * (f - n) + 1));
-		var E = Log2(c) * F;
-		var G = Rcp(c) - n;
+    internal struct LightingDataStruct
+    {
+        public Float3 lightDirection0;
+        public int Count;
+        public Float3 lightColor0;
+        public int dirLightCount;
+        public Float3 lightDirection1;
+        public float Item6;
+        public Float3 lightColor1;
+        public float DirectionalBlockerDistance;
+        public Float4 Item9;
+        public float fadeScale;
+        public float fadeOffset;
+        public float Item12;
+        public float Item13;
 
-		var fadeScale = -Rcp(settings.DirectionalFadeLength);
-		var fadeOffset = settings.DirectionalShadowDistance * Rcp(settings.DirectionalFadeLength);
-
-		var lightingData = renderGraph.SetConstantBuffer(new LightingDataStruct
-		(
-			-lightRotation0.Forward,
-			directionalShadowRequests.Count,
-			lightColor0,
-			dirLightCount,
-			-lightRotation1.Forward,
-			settings.DirectionalMaxFilterSize,
-            lightColor1,
-			settings.DirectionalBlockerDistance,
-			new Float4(E, F, G, 0),
-			fadeScale,
-			fadeOffset,
-			settings.DirectionalShadowResolution,
-			Rcp(settings.DirectionalShadowResolution)
-		));
-
-		renderGraph.SetResource(new LightingData(lightRotation0, lightColor0, lightRotation1, lightColor1, lightingData, directionalShadowMatricesBuffer, directionalCascadeSizesBuffer));
-
-		var pointLightBuffer = lightList.Count == 0 ? renderGraph.EmptyBuffer : renderGraph.GetBuffer(lightList.Count, UnsafeUtility.SizeOf<LightData>());
-		using (var pass = renderGraph.AddGenericRenderPass("Set Light Data", (lightList, pointLightBuffer)))
-		{
-			pass.WriteBuffer("", pointLightBuffer);
-			pass.SetRenderFunction(static (command, pass, data) =>
-			{
-				command.SetBufferData(pass.GetBuffer(data.pointLightBuffer), data.lightList);
-				ListPool<LightData>.Release(data.lightList);
-			});
-		}
-
-		renderGraph.SetResource(new Result(pointLightBuffer, lightList.Count));
-		renderGraph.SetResource(new ShadowRequestsData(directionalShadowRequests, pointShadowRequests, spotShadowRequests));
-	}
-
-	private ShadowSplitData CalculateShadowSplitData(Float4x4 viewProjectionMatrix, bool skipNearPlane)
-	{
-        var shadowSplitData = new ShadowSplitData() { shadowCascadeBlendCullingFactor = 1 };
-        for (var i = FrustumPlane.Left; i < FrustumPlane.Count; i++)
-		{
-			if (!skipNearPlane || i != FrustumPlane.Near)
-				shadowSplitData.SetCullingPlane(shadowSplitData.cullingPlaneCount++, viewProjectionMatrix.GetFrustumPlane(i));
-		}
-
-		return shadowSplitData;
-	}
-
-	/// <summary> Add any planes that face away from the light direction. This avoids rendering shadowcasters that can never cast a visible shadow </summary>
-	private ShadowSplitData CalculateShadowSplitData(Float4x4 viewProjectionMatrix, Float3 forward, bool skipNearPlane)
-	{
-		var shadowSplitData = CalculateShadowSplitData(viewProjectionMatrix, skipNearPlane);
-		for (var i = FrustumPlane.Left; i < FrustumPlane.Count; i++)
-		{
-			var plane = viewProjectionMatrix.GetFrustumPlane(i);
-			if (plane.xyz.Dot(forward) < 0.0f)
-				shadowSplitData.SetCullingPlane(shadowSplitData.cullingPlaneCount++, plane);
-		}
-
-		return shadowSplitData;
-	}
-}
-
-internal struct LightingDataStruct
-{
-	public Float3 lightDirection0;
-	public int Count;
-	public Float3 lightColor0;
-	public int dirLightCount;
-	public Float3 lightDirection1;
-	public float Item6;
-	public Float3 lightColor1;
-	public float DirectionalBlockerDistance;
-	public Float4 Item9;
-	public float fadeScale;
-	public float fadeOffset;
-	public float Item12;
-	public float Item13;
-
-	public LightingDataStruct(Float3 lightDirection0, int count, Float3 lightColor0, int dirLightCount, Float3 lightDirection1, float item6, Float3 lightColor1, float directionalBlockerDistance, Float4 item9, float fadeScale, float fadeOffset, float item12, float item13)
-	{
-		this.lightDirection0 = lightDirection0;
-		Count = count;
-		this.lightColor0 = lightColor0;
-		this.dirLightCount = dirLightCount;
-		this.lightDirection1 = lightDirection1;
-		Item6 = item6;
-		this.lightColor1 = lightColor1;
-		DirectionalBlockerDistance = directionalBlockerDistance;
-		Item9 = item9;
-		this.fadeScale = fadeScale;
-		this.fadeOffset = fadeOffset;
-		Item12 = item12;
-		Item13 = item13;
-	}
+        public LightingDataStruct(Float3 lightDirection0, int count, Float3 lightColor0, int dirLightCount, Float3 lightDirection1, float item6, Float3 lightColor1, float directionalBlockerDistance, Float4 item9, float fadeScale, float fadeOffset, float item12, float item13)
+        {
+            this.lightDirection0 = lightDirection0;
+            Count = count;
+            this.lightColor0 = lightColor0;
+            this.dirLightCount = dirLightCount;
+            this.lightDirection1 = lightDirection1;
+            Item6 = item6;
+            this.lightColor1 = lightColor1;
+            DirectionalBlockerDistance = directionalBlockerDistance;
+            Item9 = item9;
+            this.fadeScale = fadeScale;
+            this.fadeOffset = fadeOffset;
+            Item12 = item12;
+            Item13 = item13;
+        }
+    }
 }

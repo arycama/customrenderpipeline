@@ -1,27 +1,30 @@
 ﻿using UnityEngine;
 using UnityEngine.Rendering;
 
-public readonly struct CausticsResult : IRenderPassData
+namespace CustomRenderPipeline
 {
-    private readonly ResourceHandle<RenderTexture> caustics;
-    private readonly int cascade;
-    private readonly float depth;
-
-    public CausticsResult(ResourceHandle<RenderTexture> caustics, int cascade, float depth)
+    public readonly struct CausticsResult : IRenderPassData
     {
-        this.caustics = caustics;
-        this.cascade = cascade;
-        this.depth = depth;
+        private readonly ResourceHandle<RenderTexture> caustics;
+        private readonly int cascade;
+        private readonly float depth;
+
+        public CausticsResult(ResourceHandle<RenderTexture> caustics, int cascade, float depth)
+        {
+            this.caustics = caustics;
+            this.cascade = cascade;
+            this.depth = depth;
+        }
+
+        void IRenderPassData.SetInputs(RenderPass pass)
+        {
+            pass.ReadTexture("OceanCaustics", caustics);
+        }
+
+        void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
+        {
+            pass.SetFloat("CausticsCascade", cascade);
+            pass.SetFloat("CausticsDepth", depth);
+        }
     }
-
-	void IRenderPassData.SetInputs(RenderPass pass)
-	{
-        pass.ReadTexture("OceanCaustics", caustics);
-	}
-
-	void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
-	{
-		pass.SetFloat("CausticsCascade", cascade);
-		pass.SetFloat("CausticsDepth", depth);
-	}
 }

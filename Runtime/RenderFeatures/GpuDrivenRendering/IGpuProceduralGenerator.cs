@@ -1,5 +1,8 @@
-﻿public interface IGpuProceduralGenerator
+﻿namespace CustomRenderPipeline
 {
-    int Version { get; }
-    void Generate(RenderGraph renderGraph);
+    public interface IGpuProceduralGenerator
+    {
+        int Version { get; }
+        void Generate(RenderGraph renderGraph);
+    }
 }

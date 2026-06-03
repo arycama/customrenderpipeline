@@ -2,75 +2,78 @@ using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-public class RainTextureUpdater : ViewRenderFeature
+namespace CustomRenderPipeline
 {
-	private readonly Rain.Settings settings;
-	private readonly Material material, compositeMaterial;
-
-	public RainTextureUpdater(RenderGraph renderGraph, Rain.Settings settings) : base(renderGraph)
-	{
-		this.settings = settings;
-		material = new Material(Shader.Find("Hidden/Rain Texture")) { hideFlags = HideFlags.HideAndDontSave };
-		compositeMaterial = new Material(Shader.Find("Hidden/Rain Composite")) { hideFlags = HideFlags.HideAndDontSave };
-	}
-
-	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+    public class RainTextureUpdater : ViewRenderFeature
     {
-        if (settings.WetLevel == 0)
-            return;
+        private readonly Rain.Settings settings;
+        private readonly Material material, compositeMaterial;
 
-		var rainTexture = renderGraph.GetTexture(settings.Resolution, UnityEngine.Experimental.Rendering.GraphicsFormat.R8G8_SNorm, isExactSize: true, hasMips: true, autoGenerateMips: true);
+        public RainTextureUpdater(RenderGraph renderGraph, Rain.Settings settings) : base(renderGraph)
+        {
+            this.settings = settings;
+            material = new Material(Shader.Find("Hidden/Rain Texture")) { hideFlags = HideFlags.HideAndDontSave };
+            compositeMaterial = new Material(Shader.Find("Hidden/Rain Composite")) { hideFlags = HideFlags.HideAndDontSave };
+        }
 
-		using (var pass = renderGraph.AddFullscreenRenderPass("Rain Texture", (settings.Resolution, settings.Size)))
-		{
-			pass.Initialize(material, settings.Resolution);
-            pass.PreventNewSubPass = true;
+        public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+        {
+            if (settings.WetLevel == 0)
+                return;
 
-            pass.WriteTexture(rainTexture);
+            var rainTexture = renderGraph.GetTexture(settings.Resolution, UnityEngine.Experimental.Rendering.GraphicsFormat.R8G8_SNorm, isExactSize: true, hasMips: true, autoGenerateMips: true);
 
-			pass.ReadResource<FrameData>();
-			pass.ReadResource<ViewData>();
+            using (var pass = renderGraph.AddFullscreenRenderPass("Rain Texture", (settings.Resolution, settings.Size)))
+            {
+                pass.Initialize(material, settings.Resolution);
+                pass.PreventNewSubPass = true;
 
-			pass.SetRenderFunction(static (command, pass, data) =>
-			{
-				pass.SetFloat("Resolution", data.Resolution);
-				pass.SetFloat("Size", data.Size);
-			});
+                pass.WriteTexture(rainTexture);
 
-			renderGraph.SetResource(new RainTextureResult(rainTexture, settings.Size));
-		}
+                pass.ReadResource<FrameData>();
+                pass.ReadResource<ViewData>();
 
-		var albedoMetallicCopy = renderGraph.GetTexture(renderGraph.GetRtHandleData<GBufferAlbedoMetallic>().handle);
-		var normalRoughnessCopy = renderGraph.GetTexture(renderGraph.GetRtHandleData<GBufferNormalRoughness>().handle);
-		var bentNormalOcclusionCopy = renderGraph.GetTexture(renderGraph.GetRtHandleData<GBufferBentNormalOcclusion>().handle);
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    pass.SetFloat("Resolution", data.Resolution);
+                    pass.SetFloat("Size", data.Size);
+                });
 
-		using (var pass = renderGraph.AddFullscreenRenderPass("Composite", (albedoMetallicCopy, normalRoughnessCopy, bentNormalOcclusionCopy, settings.WetLevel)))
-		{
-			pass.Initialize(compositeMaterial, viewPassData.viewSize, viewPassData.viewCount, isScreenPass: true);
-            pass.PreventNewSubPass = true;
+                renderGraph.SetResource(new RainTextureResult(rainTexture, settings.Size));
+            }
 
-            pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
-			pass.WriteTexture(albedoMetallicCopy);
-			pass.WriteTexture(normalRoughnessCopy);
-			pass.WriteTexture(bentNormalOcclusionCopy);
+            var albedoMetallicCopy = renderGraph.GetTexture(renderGraph.GetRtHandleData<GBufferAlbedoMetallic>().handle);
+            var normalRoughnessCopy = renderGraph.GetTexture(renderGraph.GetRtHandleData<GBufferNormalRoughness>().handle);
+            var bentNormalOcclusionCopy = renderGraph.GetTexture(renderGraph.GetRtHandleData<GBufferBentNormalOcclusion>().handle);
 
-			pass.ReadRtHandle<GBufferAlbedoMetallic>();
-			pass.ReadRtHandle<GBufferNormalRoughness>();
-			pass.ReadRtHandle<GBufferBentNormalOcclusion>();
+            using (var pass = renderGraph.AddFullscreenRenderPass("Composite", (albedoMetallicCopy, normalRoughnessCopy, bentNormalOcclusionCopy, settings.WetLevel)))
+            {
+                pass.Initialize(compositeMaterial, viewPassData.viewSize, viewPassData.viewCount, isScreenPass: true);
+                pass.PreventNewSubPass = true;
 
-			pass.ReadRtHandle<CameraTarget>();
-			pass.ReadRtHandle<CameraDepth>();
-			pass.ReadRtHandle<CameraStencil>();
-			pass.ReadResource<RainTextureResult>();
+                pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
+                pass.WriteTexture(albedoMetallicCopy);
+                pass.WriteTexture(normalRoughnessCopy);
+                pass.WriteTexture(bentNormalOcclusionCopy);
 
-			renderGraph.SetRTHandle<GBufferAlbedoMetallic>(albedoMetallicCopy);
-			renderGraph.SetRTHandle<GBufferNormalRoughness>(normalRoughnessCopy);
-			renderGraph.SetRTHandle<GBufferBentNormalOcclusion>(bentNormalOcclusionCopy);
+                pass.ReadRtHandle<GBufferAlbedoMetallic>();
+                pass.ReadRtHandle<GBufferNormalRoughness>();
+                pass.ReadRtHandle<GBufferBentNormalOcclusion>();
 
-			pass.SetRenderFunction(static (command, pass, data) =>
-			{
-				pass.SetFloat("WetLevel", data.WetLevel);
-			});
-		}
-	}
+                pass.ReadRtHandle<CameraTarget>();
+                pass.ReadRtHandle<CameraDepth>();
+                pass.ReadRtHandle<CameraStencil>();
+                pass.ReadResource<RainTextureResult>();
+
+                renderGraph.SetRTHandle<GBufferAlbedoMetallic>(albedoMetallicCopy);
+                renderGraph.SetRTHandle<GBufferNormalRoughness>(normalRoughnessCopy);
+                renderGraph.SetRTHandle<GBufferBentNormalOcclusion>(bentNormalOcclusionCopy);
+
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    pass.SetFloat("WetLevel", data.WetLevel);
+                });
+            }
+        }
+    }
 }

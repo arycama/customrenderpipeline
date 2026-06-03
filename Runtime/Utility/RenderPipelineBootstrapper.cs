@@ -1,13 +1,16 @@
 ﻿using UnityEngine;
 
-public static class RenderPipelineBootstrapper
+namespace CustomRenderPipeline
 {
-#if UNITY_EDITOR
-    [UnityEditor.InitializeOnLoadMethod]
-#endif
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    private static void Init()
+    public static class RenderPipelineBootstrapper
     {
-        RenderPipelineDependencyResolver.AddGlobalDependency(new ProceduralGenerationController());
+#if UNITY_EDITOR
+        [UnityEditor.InitializeOnLoadMethod]
+#endif
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void Init()
+        {
+            RenderPipelineDependencyResolver.AddGlobalDependency(new ProceduralGenerationController());
+        }
     }
 }

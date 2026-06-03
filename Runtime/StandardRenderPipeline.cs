@@ -11,66 +11,68 @@ using static Unmath.Math;
     using UnityEditor;
 #endif
 
-public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelineAsset>
+namespace CustomRenderPipeline
 {
-    private static readonly IndexedString blueNoise1DIds = new("STBN/stbn_vec1_2Dx1D_128x128x64_", 64);
-    private static readonly IndexedString blueNoise2DIds = new("STBN/stbn_vec2_2Dx1D_128x128x64_", 64);
-    private static readonly IndexedString blueNoise3DIds = new("STBN/stbn_vec3_2Dx1D_128x128x64_", 64);
-
-    private static readonly IndexedString blueNoise2DUnitIds = new("STBN/stbn_unitvec2_2Dx1D_128x128x64_", 64);
-    private static readonly IndexedString blueNoise3DUnitIds = new("STBN/stbn_unitvec3_2Dx1D_128x128x64_", 64);
-    private static readonly IndexedString blueNoise3DCosineIds = new("STBN/stbn_unitvec3_cosine_2Dx1D_128x128x64_", 64);
-
-    private static readonly int BlueNoise1DId = Shader.PropertyToID("BlueNoise1D");
-    private static readonly int BlueNoise2DId = Shader.PropertyToID("BlueNoise2D");
-    private static readonly int BlueNoise3DId = Shader.PropertyToID("BlueNoise3D");
-    private static readonly int BlueNoise2DUnitId = Shader.PropertyToID("BlueNoise2DUnit");
-    private static readonly int BlueNoise3DUnitId = Shader.PropertyToID("BlueNoise3DUnit");
-    private static readonly int BlueNoise3DCosineId = Shader.PropertyToID("BlueNoise3DCosine");
-
-    private double previousTime;
-
-    private readonly PersistentRTHandleCache sceneColorCache, cameraDepthCache, cameraVelocityCache;
-    private readonly TerrainSystem terrainSystem;
-    private readonly VirtualTerrain virtualTextureUpdate;
-    private readonly TerrainShadowRenderer terrainShadowRenderer;
-    private readonly GpuDrivenRenderer gpuDrivenRenderer;
-    private readonly QuadtreeCull quadtreeCull;
-    private readonly EnvironmentConvolve environmentConvolve;
-
-    protected override float SdrLuminance => asset.ColorGrading.SdrLuminance;
-
-    private readonly Material reprojectPreviousFrameMaterial;
-
-    public CustomRenderPipeline(CustomRenderPipelineAsset renderPipelineAsset) : base(renderPipelineAsset)
+    public class StandardRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelineAsset>
     {
-        quadtreeCull = new(renderGraph);
+        private static readonly IndexedString blueNoise1DIds = new("STBN/stbn_vec1_2Dx1D_128x128x64_", 64);
+        private static readonly IndexedString blueNoise2DIds = new("STBN/stbn_vec2_2Dx1D_128x128x64_", 64);
+        private static readonly IndexedString blueNoise3DIds = new("STBN/stbn_vec3_2Dx1D_128x128x64_", 64);
 
-        sceneColorCache = new(GraphicsFormat.B10G11R11_UFloatPack32, renderGraph, "Scene Color", isScreenTexture: true);
-        cameraDepthCache = new(GraphicsFormat.D32_SFloat_S8_UInt, renderGraph, "Previous Depth", isScreenTexture: true, clear: true);
-        cameraVelocityCache = new(GraphicsFormat.R16G16_SFloat, renderGraph, "Previous Velocity", isScreenTexture: true);
+        private static readonly IndexedString blueNoise2DUnitIds = new("STBN/stbn_unitvec2_2Dx1D_128x128x64_", 64);
+        private static readonly IndexedString blueNoise3DUnitIds = new("STBN/stbn_unitvec3_2Dx1D_128x128x64_", 64);
+        private static readonly IndexedString blueNoise3DCosineIds = new("STBN/stbn_unitvec3_cosine_2Dx1D_128x128x64_", 64);
 
-        terrainSystem = new TerrainSystem(renderGraph, asset.TerrainSettings);
-        virtualTextureUpdate = new VirtualTerrain(renderGraph, asset.TerrainSettings);
-        terrainShadowRenderer = new TerrainShadowRenderer(renderGraph, asset.TerrainSettings, quadtreeCull);
-        gpuDrivenRenderer = new GpuDrivenRenderer(renderGraph);
-        environmentConvolve = new EnvironmentConvolve(renderGraph, asset.EnvironmentLighting);
+        private static readonly int BlueNoise1DId = Shader.PropertyToID("BlueNoise1D");
+        private static readonly int BlueNoise2DId = Shader.PropertyToID("BlueNoise2D");
+        private static readonly int BlueNoise3DId = Shader.PropertyToID("BlueNoise3D");
+        private static readonly int BlueNoise2DUnitId = Shader.PropertyToID("BlueNoise2DUnit");
+        private static readonly int BlueNoise3DUnitId = Shader.PropertyToID("BlueNoise3DUnit");
+        private static readonly int BlueNoise3DCosineId = Shader.PropertyToID("BlueNoise3DCosine");
 
-        reprojectPreviousFrameMaterial = new Material(Shader.Find("Hidden/Reproject Previous Frame")) { hideFlags = HideFlags.HideAndDontSave };
-    }
+        private double previousTime;
 
-    protected override void Dispose(bool disposing)
-    {
-        base.Dispose(disposing);
+        private readonly PersistentRTHandleCache sceneColorCache, cameraDepthCache, cameraVelocityCache;
+        private readonly TerrainSystem terrainSystem;
+        private readonly VirtualTerrain virtualTextureUpdate;
+        private readonly TerrainShadowRenderer terrainShadowRenderer;
+        private readonly GpuDrivenRenderer gpuDrivenRenderer;
+        private readonly QuadtreeCull quadtreeCull;
+        private readonly EnvironmentConvolve environmentConvolve;
 
-        sceneColorCache.Dispose();
-        cameraDepthCache.Dispose();
-        cameraVelocityCache.Dispose();
-        terrainShadowRenderer.Dispose();
-        gpuDrivenRenderer.Dispose();
-    }
+        protected override float SdrLuminance => asset.ColorGrading.SdrLuminance;
 
-    protected override List<FrameRenderFeature> InitializePerFrameRenderFeatures() => new()
+        private readonly Material reprojectPreviousFrameMaterial;
+
+        public StandardRenderPipeline(CustomRenderPipelineAsset renderPipelineAsset) : base(renderPipelineAsset)
+        {
+            quadtreeCull = new(renderGraph);
+
+            sceneColorCache = new(GraphicsFormat.B10G11R11_UFloatPack32, renderGraph, "Scene Color", isScreenTexture: true);
+            cameraDepthCache = new(GraphicsFormat.D32_SFloat_S8_UInt, renderGraph, "Previous Depth", isScreenTexture: true, clear: true);
+            cameraVelocityCache = new(GraphicsFormat.R16G16_SFloat, renderGraph, "Previous Velocity", isScreenTexture: true);
+
+            terrainSystem = new TerrainSystem(renderGraph, asset.TerrainSettings);
+            virtualTextureUpdate = new VirtualTerrain(renderGraph, asset.TerrainSettings);
+            terrainShadowRenderer = new TerrainShadowRenderer(renderGraph, asset.TerrainSettings, quadtreeCull);
+            gpuDrivenRenderer = new GpuDrivenRenderer(renderGraph);
+            environmentConvolve = new EnvironmentConvolve(renderGraph, asset.EnvironmentLighting);
+
+            reprojectPreviousFrameMaterial = new Material(Shader.Find("Hidden/Reproject Previous Frame")) { hideFlags = HideFlags.HideAndDontSave };
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            base.Dispose(disposing);
+
+            sceneColorCache.Dispose();
+            cameraDepthCache.Dispose();
+            cameraVelocityCache.Dispose();
+            terrainShadowRenderer.Dispose();
+            gpuDrivenRenderer.Dispose();
+        }
+
+        protected override List<FrameRenderFeature> InitializePerFrameRenderFeatures() => new()
     {
         terrainSystem,
         virtualTextureUpdate,
@@ -148,7 +150,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
         new ColorGrading(renderGraph, asset.ColorGrading)
     };
 
-    protected override List<ViewRenderFeature> InitializePerCameraRenderFeatures() => new()
+        protected override List<ViewRenderFeature> InitializePerCameraRenderFeatures() => new()
     {
         new GenericViewRenderFeature(renderGraph, (in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context) =>
         {
@@ -429,46 +431,47 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
         new RenderGizmos(renderGraph),
         new Tonemapping(renderGraph, asset.ColorGrading, asset.Bloom),
     };
-}
+    }
 
-internal struct FrameDataStruct
-{
-    public Float4x4 overlayMatrix;
-    public float Item2;
-    public float Item3;
-    public float Item4;
-    public float Item5;
-    public float Item6;
-    public float sunCosAngle;
-    public float Item8;
-    public float Item9;
-    public float Item10;
-    public float Item11;
-    public float Item12;
-    public float Item13;
-    public int Item14;
-    public int Item15;
-    public float sinSigmaSq;
-    public float Item17;
-
-    public FrameDataStruct(Float4x4 overlayMatrix, float item2, float item3, float item4, float item5, float item6, float sunCosAngle, float item8, float item9, float item10, float item11, float item12, float item13, int item14, int item15, float sinSigmaSq, float item17)
+    internal struct FrameDataStruct
     {
-        this.overlayMatrix = overlayMatrix;
-        Item2 = item2;
-        Item3 = item3;
-        Item4 = item4;
-        Item5 = item5;
-        Item6 = item6;
-        this.sunCosAngle = sunCosAngle;
-        Item8 = item8;
-        Item9 = item9;
-        Item10 = item10;
-        Item11 = item11;
-        Item12 = item12;
-        Item13 = item13;
-        Item14 = item14;
-        Item15 = item15;
-        this.sinSigmaSq = sinSigmaSq;
-        Item17 = item17;
+        public Float4x4 overlayMatrix;
+        public float Item2;
+        public float Item3;
+        public float Item4;
+        public float Item5;
+        public float Item6;
+        public float sunCosAngle;
+        public float Item8;
+        public float Item9;
+        public float Item10;
+        public float Item11;
+        public float Item12;
+        public float Item13;
+        public int Item14;
+        public int Item15;
+        public float sinSigmaSq;
+        public float Item17;
+
+        public FrameDataStruct(Float4x4 overlayMatrix, float item2, float item3, float item4, float item5, float item6, float sunCosAngle, float item8, float item9, float item10, float item11, float item12, float item13, int item14, int item15, float sinSigmaSq, float item17)
+        {
+            this.overlayMatrix = overlayMatrix;
+            Item2 = item2;
+            Item3 = item3;
+            Item4 = item4;
+            Item5 = item5;
+            Item6 = item6;
+            this.sunCosAngle = sunCosAngle;
+            Item8 = item8;
+            Item9 = item9;
+            Item10 = item10;
+            Item11 = item11;
+            Item12 = item12;
+            Item13 = item13;
+            Item14 = item14;
+            Item15 = item15;
+            this.sinSigmaSq = sinSigmaSq;
+            Item17 = item17;
+        }
     }
 }

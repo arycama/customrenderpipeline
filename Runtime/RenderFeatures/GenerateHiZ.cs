@@ -3,89 +3,92 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public class GenerateHiZ : ViewRenderFeature
+namespace CustomRenderPipeline
 {
-	private readonly IndexedShaderPropertyId resultIds = new("_Result");
-	private readonly ComputeShader computeShader;
-	private readonly HiZMode mode;
-
-	public GenerateHiZ(RenderGraph renderGraph, HiZMode mode) : base(renderGraph)
-	{
-		computeShader = Resources.Load<ComputeShader>("Utility/HiZ");
-		this.mode = mode;
-	}
-
-	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+    public class GenerateHiZ : ViewRenderFeature
     {
-		using var scope = renderGraph.AddProfileScope("Generate HiZ");
+        private readonly IndexedShaderPropertyId resultIds = new("_Result");
+        private readonly ComputeShader computeShader;
+        private readonly HiZMode mode;
 
-		var kernel = (int)mode * 2;
-		var mipCount = Texture2DExtensions.MipCount(viewPassData.viewSize);
-		var maxMipsPerPass = 6;
-		var hasSecondPass = mipCount > maxMipsPerPass;
+        public GenerateHiZ(RenderGraph renderGraph, HiZMode mode) : base(renderGraph)
+        {
+            computeShader = Resources.Load<ComputeShader>("Utility/HiZ");
+            this.mode = mode;
+        }
 
-		// Set is screen to true to get exact fit
-		var result = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.R32_SFloat, hasMips: true, isScreenTexture: true);
+        public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+        {
+            using var scope = renderGraph.AddProfileScope("Generate HiZ");
 
-        // First pass
-        var cameraDepthHandle = renderGraph.GetRtHandleData<CameraDepth>().handle;
-        using (var pass = renderGraph.AddComputeRenderPass("Hi Z First Pass", (viewPassData.viewSize, hasSecondPass ? maxMipsPerPass : mipCount, cameraDepthHandle)))
-		{
-			pass.Initialize(computeShader, kernel, viewPassData.viewSize.x, viewPassData.viewSize.y);
-			pass.ReadTexture("_Input", cameraDepthHandle);
+            var kernel = (int)mode * 2;
+            var mipCount = Texture2DExtensions.MipCount(viewPassData.viewSize);
+            var maxMipsPerPass = 6;
+            var hasSecondPass = mipCount > maxMipsPerPass;
 
-			for (var i = 0; i < maxMipsPerPass; i++)
-			{
-				var texture = i < mipCount ? result : renderGraph.EmptyUavTexture;
-				var mip = i < mipCount ? i : 0;
-				pass.WriteTexture(resultIds.GetProperty(i), texture, mip);
-			}
+            // Set is screen to true to get exact fit
+            var result = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.R32_SFloat, hasMips: true, isScreenTexture: true);
 
-			pass.SetRenderFunction(static (command, pass, data) =>
-			{
-				pass.SetInt("_Width", data.viewSize.x);
-				pass.SetInt("_Height", data.viewSize.y);
-				pass.SetInt("_MaxMip", data.Item2);
-                pass.SetVector("_InputScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.cameraDepthHandle));
-			});
-		}
+            // First pass
+            var cameraDepthHandle = renderGraph.GetRtHandleData<CameraDepth>().handle;
+            using (var pass = renderGraph.AddComputeRenderPass("Hi Z First Pass", (viewPassData.viewSize, hasSecondPass ? maxMipsPerPass : mipCount, cameraDepthHandle)))
+            {
+                pass.Initialize(computeShader, kernel, viewPassData.viewSize.x, viewPassData.viewSize.y);
+                pass.ReadTexture("_Input", cameraDepthHandle);
 
-		// Second pass if needed
-		if (hasSecondPass)
-		{
-			using (var pass = renderGraph.AddComputeRenderPass("Hi Z Second Pass", (viewPassData.viewSize, maxMipsPerPass, mipCount)))
-			{
-				pass.Initialize(computeShader, kernel + 1, viewPassData.viewSize.x >> (maxMipsPerPass - 1), viewPassData.viewSize.y >> (maxMipsPerPass - 1));
+                for (var i = 0; i < maxMipsPerPass; i++)
+                {
+                    var texture = i < mipCount ? result : renderGraph.EmptyUavTexture;
+                    var mip = i < mipCount ? i : 0;
+                    pass.WriteTexture(resultIds.GetProperty(i), texture, mip);
+                }
 
-				for (var i = 0; i < maxMipsPerPass; i++)
-				{
-					var level = i + maxMipsPerPass - 1;
-					var texture = level < mipCount ? result : renderGraph.EmptyUavTexture;
-					var mip = level < mipCount ? level : 0;
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    pass.SetInt("_Width", data.viewSize.x);
+                    pass.SetInt("_Height", data.viewSize.y);
+                    pass.SetInt("_MaxMip", data.Item2);
+                    pass.SetVector("_InputScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.cameraDepthHandle));
+                });
+            }
 
-					// Start from maxMips - 1, as we bind the last mip from the last pass as the first input for this pass
-					pass.WriteTexture(resultIds.GetProperty(i), texture, mip);
-				}
+            // Second pass if needed
+            if (hasSecondPass)
+            {
+                using (var pass = renderGraph.AddComputeRenderPass("Hi Z Second Pass", (viewPassData.viewSize, maxMipsPerPass, mipCount)))
+                {
+                    pass.Initialize(computeShader, kernel + 1, viewPassData.viewSize.x >> (maxMipsPerPass - 1), viewPassData.viewSize.y >> (maxMipsPerPass - 1));
 
-				pass.SetRenderFunction(static (command, pass, data) =>
-				{
-					pass.SetInt("_Width", data.viewSize.x >> (data.maxMipsPerPass - 1));
-					pass.SetInt("_Height", data.viewSize.y >> (data.maxMipsPerPass - 1));
-					pass.SetInt("_MaxMip", data.mipCount - data.maxMipsPerPass);
-				});
-			}
-		}
+                    for (var i = 0; i < maxMipsPerPass; i++)
+                    {
+                        var level = i + maxMipsPerPass - 1;
+                        var texture = level < mipCount ? result : renderGraph.EmptyUavTexture;
+                        var mip = level < mipCount ? level : 0;
 
-		if(mode == HiZMode.Min)
-			renderGraph.SetRTHandle<HiZMinDepth>(result);
-		else if (mode == HiZMode.Max)
-			renderGraph.SetRTHandle<HiZMaxDepth>(result);
-	}
+                        // Start from maxMips - 1, as we bind the last mip from the last pass as the first input for this pass
+                        pass.WriteTexture(resultIds.GetProperty(i), texture, mip);
+                    }
 
-	public enum HiZMode
-	{
-		Min,
-		Max,
-		CheckerMinMax
-	}
+                    pass.SetRenderFunction(static (command, pass, data) =>
+                    {
+                        pass.SetInt("_Width", data.viewSize.x >> (data.maxMipsPerPass - 1));
+                        pass.SetInt("_Height", data.viewSize.y >> (data.maxMipsPerPass - 1));
+                        pass.SetInt("_MaxMip", data.mipCount - data.maxMipsPerPass);
+                    });
+                }
+            }
+
+            if (mode == HiZMode.Min)
+                renderGraph.SetRTHandle<HiZMinDepth>(result);
+            else if (mode == HiZMode.Max)
+                renderGraph.SetRTHandle<HiZMaxDepth>(result);
+        }
+
+        public enum HiZMode
+        {
+            Min,
+            Max,
+            CheckerMinMax
+        }
+    }
 }

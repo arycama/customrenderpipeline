@@ -3,155 +3,158 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public partial class AmbientOcclusion : ViewRenderFeature
+namespace CustomRenderPipeline
 {
-    [Serializable]
-    public class Settings
+    public partial class AmbientOcclusion : ViewRenderFeature
     {
-        [field: SerializeField] public bool AmbientOcclusion { get; private set; } = true;
-        [field: SerializeField] public bool Raytracing { get; private set; } = true;
-        [field: SerializeField, Min(0)] public float AoStrength { get; private set; } = 1;
-        [field: SerializeField, Min(0)] public float Radius { get; private set; } = 5;
-        [field: SerializeField, Range(1, 8)] public int Directions { get; private set; } = 4;
-        [field: SerializeField, Range(1, 32)] public int Samples { get; private set; } = 8;
-        [field: SerializeField, Range(0, 1)] public float Falloff { get; private set; } = 0.75f;
-        [field: SerializeField, Range(0, 1)] public float MaxScreenRadius { get; private set; } = 0.15f;
-        [field: SerializeField, Range(0, 0.01f)] public float ThinOccluderCompensation { get; private set; } = 0.05f;
-    }
-
-    private readonly Material material;
-    private readonly Settings settings;
-    private readonly RayTracingShader ambientOcclusionRaytracingShader;
-
-    private readonly PersistentRTHandleCache temporalCache, speedCache;
-
-    public AmbientOcclusion(RenderGraph renderGraph, Settings settings) : base(renderGraph)
-    {
-        material = new Material(Shader.Find("Hidden/Ambient Occlusion")) { hideFlags = HideFlags.HideAndDontSave };
-        this.settings = settings;
-        temporalCache = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Ambient Occlusion", isScreenTexture: true);
-        ambientOcclusionRaytracingShader = Resources.Load<RayTracingShader>("Raytracing/AmbientOcclusion");
-        speedCache = new PersistentRTHandleCache(GraphicsFormat.R8_UNorm, renderGraph, "SSGI Weight", isScreenTexture: true);
-    }
-
-    protected override void Cleanup(bool disposing)
-    {
-        temporalCache.Dispose();
-        speedCache.Dispose();
-    }
-
-    public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
-    {
-        if (!settings.AmbientOcclusion)
-            return;
-
-        renderGraph.AddProfileBeginPass("Ambient Occlusion");
-
-        ResourceHandle<RenderTexture> result;
-        if (settings.Raytracing)
+        [Serializable]
+        public class Settings
         {
-            result = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
-            using (var pass = renderGraph.AddRaytracingRenderPass("Raytraced Ambient Occlusion", (settings.Radius, settings.Falloff)))
-            {
-                var raytracingData = renderGraph.GetResource<RaytracingResult>();
-
-                pass.Initialize(ambientOcclusionRaytracingShader, "RayGeneration", "RaytracingVisibility", raytracingData.Rtas, viewPassData.viewSize.x, viewPassData.viewSize.y, 1, raytracingData.Bias, raytracingData.DistantBias, viewPassData.tanHalfFov.y);
-                pass.WriteTexture(result, "HitResult");
-
-                pass.ReadRtHandle<CameraDepth>();
-                pass.ReadRtHandle<GBufferNormalRoughness>();
-                pass.ReadResource<ViewData>();
-                pass.ReadResource<FrameData>();
-
-                pass.SetRenderFunction(static (command, pass, data) =>
-                {
-                    pass.SetFloat("Radius", data.Radius);
-                    pass.SetFloat("Falloff", data.Falloff);
-                });
-            }
+            [field: SerializeField] public bool AmbientOcclusion { get; private set; } = true;
+            [field: SerializeField] public bool Raytracing { get; private set; } = true;
+            [field: SerializeField, Min(0)] public float AoStrength { get; private set; } = 1;
+            [field: SerializeField, Min(0)] public float Radius { get; private set; } = 5;
+            [field: SerializeField, Range(1, 8)] public int Directions { get; private set; } = 4;
+            [field: SerializeField, Range(1, 32)] public int Samples { get; private set; } = 8;
+            [field: SerializeField, Range(0, 1)] public float Falloff { get; private set; } = 0.75f;
+            [field: SerializeField, Range(0, 1)] public float MaxScreenRadius { get; private set; } = 0.15f;
+            [field: SerializeField, Range(0, 0.01f)] public float ThinOccluderCompensation { get; private set; } = 0.05f;
         }
-        else
+
+        private readonly Material material;
+        private readonly Settings settings;
+        private readonly RayTracingShader ambientOcclusionRaytracingShader;
+
+        private readonly PersistentRTHandleCache temporalCache, speedCache;
+
+        public AmbientOcclusion(RenderGraph renderGraph, Settings settings) : base(renderGraph)
         {
-            result = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
-            using (var pass = renderGraph.AddFullscreenRenderPass("Ambient Occlusion Compute", (settings.Radius, settings.Directions, settings.Samples, settings.Falloff, settings.MaxScreenRadius, settings.ThinOccluderCompensation)))
+            material = new Material(Shader.Find("Hidden/Ambient Occlusion")) { hideFlags = HideFlags.HideAndDontSave };
+            this.settings = settings;
+            temporalCache = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Ambient Occlusion", isScreenTexture: true);
+            ambientOcclusionRaytracingShader = Resources.Load<RayTracingShader>("Raytracing/AmbientOcclusion");
+            speedCache = new PersistentRTHandleCache(GraphicsFormat.R8_UNorm, renderGraph, "SSGI Weight", isScreenTexture: true);
+        }
+
+        protected override void Cleanup(bool disposing)
+        {
+            temporalCache.Dispose();
+            speedCache.Dispose();
+        }
+
+        public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+        {
+            if (!settings.AmbientOcclusion)
+                return;
+
+            renderGraph.AddProfileBeginPass("Ambient Occlusion");
+
+            ResourceHandle<RenderTexture> result;
+            if (settings.Raytracing)
             {
-                pass.Initialize(material, viewPassData.viewSize, viewPassData.viewCount, 0, isScreenPass: true);
+                result = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+                using (var pass = renderGraph.AddRaytracingRenderPass("Raytraced Ambient Occlusion", (settings.Radius, settings.Falloff)))
+                {
+                    var raytracingData = renderGraph.GetResource<RaytracingResult>();
+
+                    pass.Initialize(ambientOcclusionRaytracingShader, "RayGeneration", "RaytracingVisibility", raytracingData.Rtas, viewPassData.viewSize.x, viewPassData.viewSize.y, 1, raytracingData.Bias, raytracingData.DistantBias, viewPassData.tanHalfFov.y);
+                    pass.WriteTexture(result, "HitResult");
+
+                    pass.ReadRtHandle<CameraDepth>();
+                    pass.ReadRtHandle<GBufferNormalRoughness>();
+                    pass.ReadResource<ViewData>();
+                    pass.ReadResource<FrameData>();
+
+                    pass.SetRenderFunction(static (command, pass, data) =>
+                    {
+                        pass.SetFloat("Radius", data.Radius);
+                        pass.SetFloat("Falloff", data.Falloff);
+                    });
+                }
+            }
+            else
+            {
+                result = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+                using (var pass = renderGraph.AddFullscreenRenderPass("Ambient Occlusion Compute", (settings.Radius, settings.Directions, settings.Samples, settings.Falloff, settings.MaxScreenRadius, settings.ThinOccluderCompensation)))
+                {
+                    pass.Initialize(material, viewPassData.viewSize, viewPassData.viewCount, 0, isScreenPass: true);
+                    pass.PreventNewSubPass = true;
+                    pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
+                    pass.WriteTexture(result);
+
+                    pass.ReadRtHandle<CameraDepth>();
+                    pass.ReadRtHandle<GBufferNormalRoughness>();
+                    pass.ReadResource<FrameData>();
+                    pass.ReadResource<ViewData>();
+
+                    if (settings.Directions == 1)
+                        pass.AddKeyword("SINGLE_SAMPLE");
+
+                    pass.SetRenderFunction(static (command, pass, data) =>
+                    {
+                        pass.SetFloat("Radius", data.Radius);
+                        pass.SetFloat("Directions", data.Directions);
+                        pass.SetFloat("Samples", data.Samples);
+                        pass.SetFloat("Falloff", data.Falloff);
+                        pass.SetFloat("MaxScreenRadius", data.MaxScreenRadius);
+                        pass.SetFloat("ThinOccluderCompensation", data.ThinOccluderCompensation);
+                    });
+                }
+            }
+
+            ResourceHandle<RenderTexture> current, history = default;
+            bool wasCreated = default;
+
+            using (var pass = renderGraph.AddFullscreenRenderPass("Ambient Occlusion Temporal", (wasCreated, history)))
+            {
+                (current, history, wasCreated) = temporalCache.GetTextures(viewPassData.viewSize, pass.Index, viewPassData.viewId);
+                var (currentSpeed, speedHistory, _) = speedCache.GetTextures(viewPassData.viewSize, pass.Index, viewPassData.viewId);
+                pass.renderData.wasCreated = false;
+                pass.renderData.history = history;
+
+                pass.Initialize(material, viewPassData.viewSize, viewPassData.viewCount, 1, isScreenPass: true);
                 pass.PreventNewSubPass = true;
                 pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
-                pass.WriteTexture(result);
+                pass.WriteTexture(current);
+                pass.WriteTexture(currentSpeed);
+                pass.ReadTexture("Input", result);
+                pass.ReadTexture("History", history);
+                pass.ReadTexture("SpeedHistory", speedHistory);
 
-                pass.ReadRtHandle<CameraDepth>();
-                pass.ReadRtHandle<GBufferNormalRoughness>();
                 pass.ReadResource<FrameData>();
-                pass.ReadResource<ViewData>();
-
-                if (settings.Directions == 1)
-                    pass.AddKeyword("SINGLE_SAMPLE");
+                pass.ReadRtHandle<CameraDepth>();
+                pass.ReadRtHandle<CameraVelocity>();
+                pass.ReadResource<TemporalAAData>();
+                pass.ReadRtHandle<PreviousCameraVelocity>();
+                pass.ReadRtHandle<PreviousCameraDepth>();
 
                 pass.SetRenderFunction(static (command, pass, data) =>
                 {
-                    pass.SetFloat("Radius", data.Radius);
-                    pass.SetFloat("Directions", data.Directions);
-                    pass.SetFloat("Samples", data.Samples);
-                    pass.SetFloat("Falloff", data.Falloff);
-                    pass.SetFloat("MaxScreenRadius", data.MaxScreenRadius);
-                    pass.SetFloat("ThinOccluderCompensation", data.ThinOccluderCompensation);
+                    pass.SetFloat("HasHistory", data.wasCreated ? 0 : 1);
+                    pass.SetVector("HistoryScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.history));
                 });
             }
-        }
 
-        ResourceHandle<RenderTexture> current, history = default;
-        bool wasCreated = default;
-
-        using (var pass = renderGraph.AddFullscreenRenderPass("Ambient Occlusion Temporal", (wasCreated, history)))
-        {
-            (current, history, wasCreated) = temporalCache.GetTextures(viewPassData.viewSize, pass.Index, viewPassData.viewId);
-            var (currentSpeed, speedHistory, _) = speedCache.GetTextures(viewPassData.viewSize, pass.Index, viewPassData.viewId);
-            pass.renderData.wasCreated = false;
-            pass.renderData.history = history;
-
-            pass.Initialize(material, viewPassData.viewSize, viewPassData.viewCount, 1, isScreenPass: true);
-            pass.PreventNewSubPass = true;
-            pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
-            pass.WriteTexture(current);
-            pass.WriteTexture(currentSpeed);
-            pass.ReadTexture("Input", result);
-            pass.ReadTexture("History", history);
-            pass.ReadTexture("SpeedHistory", speedHistory);
-
-            pass.ReadResource<FrameData>();
-            pass.ReadRtHandle<CameraDepth>();
-            pass.ReadRtHandle<CameraVelocity>();
-            pass.ReadResource<TemporalAAData>();
-            pass.ReadRtHandle<PreviousCameraVelocity>();
-            pass.ReadRtHandle<PreviousCameraDepth>();
-
-            pass.SetRenderFunction(static (command, pass, data) =>
+            var output = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true);
+            using (var pass = renderGraph.AddFullscreenRenderPass("Ambient Occlusion Combine", (settings.AoStrength, current)))
             {
-                pass.SetFloat("HasHistory", data.wasCreated ? 0 : 1);
-                pass.SetVector("HistoryScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.history));
-            });
+                pass.Initialize(material, viewPassData.viewSize, viewPassData.viewCount, 2, isScreenPass: true);
+                pass.PreventNewSubPass = true;
+                pass.WriteTexture(output);
+                pass.ReadTexture("Input", current);
+                pass.ReadRtHandle<GBufferBentNormalOcclusion>();
+                pass.ReadResource<TemporalAAData>();
+
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    pass.SetFloat("Strength", data.AoStrength);
+                    pass.SetVector("InputScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.current));
+                });
+            }
+
+            renderGraph.SetRTHandle<GBufferBentNormalOcclusion>(output);
+
+            renderGraph.AddProfileEndPass("Ambient Occlusion");
         }
-
-        var output = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true);
-        using (var pass = renderGraph.AddFullscreenRenderPass("Ambient Occlusion Combine", (settings.AoStrength, current)))
-        {
-            pass.Initialize(material, viewPassData.viewSize, viewPassData.viewCount, 2, isScreenPass: true);
-            pass.PreventNewSubPass = true;
-            pass.WriteTexture(output);
-            pass.ReadTexture("Input", current);
-            pass.ReadRtHandle<GBufferBentNormalOcclusion>();
-            pass.ReadResource<TemporalAAData>();
-
-            pass.SetRenderFunction(static (command, pass, data) =>
-            {
-                pass.SetFloat("Strength", data.AoStrength);
-                pass.SetVector("InputScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.current));
-            });
-        }
-
-        renderGraph.SetRTHandle<GBufferBentNormalOcclusion>(output);
-
-        renderGraph.AddProfileEndPass("Ambient Occlusion");
     }
 }

@@ -43,10 +43,11 @@ float3 Fragment(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 	//color = ssr;
 
 	color *= PaperWhite;
-	color = Rec2020ToICtCp(color);
-	color.yz += 0.5;
-	color = LutScaleOffset.x * color + LutScaleOffset.y;
-	color = ColorGrading.Sample(TrilinearClampSampler, color);
+	color = LinearToST2084(color);
+	//color = Rec2020ToICtCp(color);
+	//color.yz += 0.5;
+	//color = LutScaleOffset.x * color + LutScaleOffset.y;
+	//color = ColorGrading.Sample(TrilinearClampSampler, color);
 	
 	#ifdef GIZMOS_ON
 		color = ST2084ToLinear(color);

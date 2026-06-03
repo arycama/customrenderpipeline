@@ -4,131 +4,134 @@ using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
 
-public partial class Sky : ViewRenderFeature
+namespace CustomRenderPipeline
 {
-	private static readonly int StarsId = Shader.PropertyToID("Stars");
-
-    private readonly Settings settings;
-	private readonly Material skyMaterial;
-
-	private readonly PersistentRTHandleCache textureCache, weightCache;
-
-	public Sky(RenderGraph renderGraph, Settings settings) : base(renderGraph)
-	{
-		this.settings = settings;
-
-		skyMaterial = new Material(Shader.Find("Hidden/Physical Sky")) { hideFlags = HideFlags.HideAndDontSave };
-		textureCache = new(GraphicsFormat.R32_UInt, renderGraph, "Sky", isScreenTexture: true);
-        weightCache = new(GraphicsFormat.R8_UNorm, renderGraph, "Sky", isScreenTexture: true);
-	}
-
-	protected override void Cleanup(bool disposing)
-	{
-		Object.DestroyImmediate(skyMaterial);
-		textureCache.Dispose();
-        weightCache.Dispose();
-	}
-
-	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+    public partial class Sky : ViewRenderFeature
     {
-		renderGraph.AddProfileBeginPass("Sky");
+        private static readonly int StarsId = Shader.PropertyToID("Stars");
 
-		var skyTemp = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
-        var viewSize = viewPassData.viewSize;
+        private readonly Settings settings;
+        private readonly Material skyMaterial;
 
-        void RenderPass(string passName)
+        private readonly PersistentRTHandleCache textureCache, weightCache;
+
+        public Sky(RenderGraph renderGraph, Settings settings) : base(renderGraph)
         {
-            using (var pass = renderGraph.AddFullscreenRenderPass("Render Sky", settings.RenderSamples))
+            this.settings = settings;
+
+            skyMaterial = new Material(Shader.Find("Hidden/Physical Sky")) { hideFlags = HideFlags.HideAndDontSave };
+            textureCache = new(GraphicsFormat.R32_UInt, renderGraph, "Sky", isScreenTexture: true);
+            weightCache = new(GraphicsFormat.R8_UNorm, renderGraph, "Sky", isScreenTexture: true);
+        }
+
+        protected override void Cleanup(bool disposing)
+        {
+            Object.DestroyImmediate(skyMaterial);
+            textureCache.Dispose();
+            weightCache.Dispose();
+        }
+
+        public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+        {
+            renderGraph.AddProfileBeginPass("Sky");
+
+            var skyTemp = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
+            var viewSize = viewPassData.viewSize;
+
+            void RenderPass(string passName)
             {
-                pass.Initialize(skyMaterial, viewSize, 1, skyMaterial.FindPass(passName), isScreenPass: true);
+                using (var pass = renderGraph.AddFullscreenRenderPass("Render Sky", settings.RenderSamples))
+                {
+                    pass.Initialize(skyMaterial, viewSize, 1, skyMaterial.FindPass(passName), isScreenPass: true);
+                    pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
+                    pass.WriteTexture(skyTemp);
+
+                    pass.PreventNewSubPass = true;
+
+                    pass.ReadResource<AtmospherePropertiesAndTables>();
+                    pass.ReadResource<AutoExposureData>();
+                    pass.ReadResource<CloudShadowDataResult>();
+                    pass.ReadResource<LightingData>();
+                    pass.ReadResource<ShadowData>();
+                    pass.ReadResource<SkyReflectionAmbientData>();
+                    pass.ReadResource<ViewData>();
+                    pass.ReadResource<SkyViewTransmittanceData>();
+                    pass.ReadRtHandle<CameraDepth>();
+
+                    if (pass.TryReadResource<CloudRenderResult>())
+                        pass.AddKeyword("CLOUDS_ON");
+
+                    pass.SetRenderFunction(static (command, pass, data) =>
+                    {
+                        pass.SetFloat("_Samples", data);
+                    });
+                }
+            }
+
+            RenderPass("Render Sky");
+            RenderPass("Render Scene");
+
+            bool wasCreated = default;
+            ResourceHandle<RenderTexture> current, history = default;
+
+            // Reprojection+combine
+            using (var pass = renderGraph.AddFullscreenRenderPass("Temporal", (history, wasCreated, settings.StationaryBlend, settings.MotionBlend, settings.MotionFactor, settings.DepthFactor, settings.ClampWindow, settings.MaxFrameCount, viewPassData.viewSize, settings.StarMap, settings.StarExposure)))
+            {
+                (current, history, wasCreated) = textureCache.GetTextures(viewPassData.viewSize, pass.Index, viewPassData.viewId);
+                var (weightCurrent, weightHistory, weightWasCreated) = weightCache.GetTextures(viewPassData.viewSize, pass.Index, viewPassData.viewId);
+
+                pass.renderData.history = history;
+                pass.renderData.wasCreated = wasCreated;
+
+                pass.Initialize(skyMaterial, viewPassData.viewSize, 1, skyMaterial.FindPass("Temporal"), isScreenPass: true);
                 pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
-                pass.WriteTexture(skyTemp);
+                pass.WriteRtHandle<CameraTarget>();
+                pass.WriteTexture(current);
+                pass.WriteTexture(weightCurrent);
+
+                pass.ReadTexture("Input", skyTemp);
+                pass.ReadTexture("PreviousLuminance", history);
+                pass.ReadTexture("PreviousSpeed", weightHistory);
 
                 pass.PreventNewSubPass = true;
 
                 pass.ReadResource<AtmospherePropertiesAndTables>();
+                pass.ReadResource<TemporalAAData>();
                 pass.ReadResource<AutoExposureData>();
-                pass.ReadResource<CloudShadowDataResult>();
-                pass.ReadResource<LightingData>();
-                pass.ReadResource<ShadowData>();
-                pass.ReadResource<SkyReflectionAmbientData>();
+                pass.ReadRtHandle<PreviousCameraDepth>();
+                pass.ReadRtHandle<PreviousCameraVelocity>();
                 pass.ReadResource<ViewData>();
-                pass.ReadResource<SkyViewTransmittanceData>();
+                pass.ReadRtHandle<CameraVelocity>();
                 pass.ReadRtHandle<CameraDepth>();
+                pass.ReadResource<VolumetricLighting.Result>();
 
                 if (pass.TryReadResource<CloudRenderResult>())
                     pass.AddKeyword("CLOUDS_ON");
 
                 pass.SetRenderFunction(static (command, pass, data) =>
                 {
-                    pass.SetFloat("_Samples", data);
+                    pass.SetVector("PreviousLuminanceScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.history));
+
+                    pass.SetFloat("IsFirst", data.wasCreated ? 1.0f : 0.0f);
+                    pass.SetFloat("StationaryBlend", data.StationaryBlend);
+                    pass.SetFloat("MotionBlend", data.MotionBlend);
+                    pass.SetFloat("MotionFactor", data.MotionFactor);
+                    pass.SetFloat("DepthFactor", data.DepthFactor);
+                    pass.SetFloat("ClampWindow", data.ClampWindow);
+
+                    pass.SetFloat("MaxFrameCount", data.MaxFrameCount);
+
+                    pass.SetInt("MaxWidth", data.Item9.x - 1);
+                    pass.SetInt("MaxHeight", data.Item9.y - 1);
+
+                    if (data.StarMap != null)
+                        pass.SetTexture(StarsId, data.StarMap);
+
+                    pass.SetFloat("StarExposure", data.StarExposure);
                 });
             }
+
+            renderGraph.AddProfileEndPass("Sky");
         }
-
-        RenderPass("Render Sky");
-        RenderPass("Render Scene");
-
-		bool wasCreated = default;
-		ResourceHandle<RenderTexture> current, history = default;
-
-		// Reprojection+combine
-		using (var pass = renderGraph.AddFullscreenRenderPass("Temporal", (history, wasCreated, settings.StationaryBlend, settings.MotionBlend, settings.MotionFactor, settings.DepthFactor, settings.ClampWindow, settings.MaxFrameCount, viewPassData.viewSize, settings.StarMap, settings.StarExposure)))
-		{
-			(current, history, wasCreated) = textureCache.GetTextures(viewPassData.viewSize, pass.Index, viewPassData.viewId);
-            var (weightCurrent, weightHistory, weightWasCreated) = weightCache.GetTextures(viewPassData.viewSize, pass.Index, viewPassData.viewId);
-
-            pass.renderData.history = history;
-			pass.renderData.wasCreated = wasCreated;
-
-			pass.Initialize(skyMaterial, viewPassData.viewSize, 1, skyMaterial.FindPass("Temporal"), isScreenPass: true);
-            pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
-			pass.WriteRtHandle<CameraTarget>();
-			pass.WriteTexture(current);
-			pass.WriteTexture(weightCurrent);
-
-			pass.ReadTexture("Input", skyTemp);
-			pass.ReadTexture("PreviousLuminance", history);
-			pass.ReadTexture("PreviousSpeed", weightHistory);
-
-            pass.PreventNewSubPass = true;
-
-            pass.ReadResource<AtmospherePropertiesAndTables>();
-			pass.ReadResource<TemporalAAData>();
-			pass.ReadResource<AutoExposureData>();
-			pass.ReadRtHandle<PreviousCameraDepth>();
-			pass.ReadRtHandle<PreviousCameraVelocity>();
-			pass.ReadResource<ViewData>();
-			pass.ReadRtHandle<CameraVelocity>();
-			pass.ReadRtHandle<CameraDepth>();
-			pass.ReadResource<VolumetricLighting.Result>();
-
-            if (pass.TryReadResource<CloudRenderResult>())
-                pass.AddKeyword("CLOUDS_ON");
-
-            pass.SetRenderFunction(static (command, pass, data) =>
-			{
-				pass.SetVector("PreviousLuminanceScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.history));
-
-				pass.SetFloat("IsFirst", data.wasCreated ? 1.0f : 0.0f);
-				pass.SetFloat("StationaryBlend", data.StationaryBlend);
-				pass.SetFloat("MotionBlend", data.MotionBlend);
-				pass.SetFloat("MotionFactor", data.MotionFactor);
-				pass.SetFloat("DepthFactor", data.DepthFactor);
-				pass.SetFloat("ClampWindow", data.ClampWindow);
-
-				pass.SetFloat("MaxFrameCount", data.MaxFrameCount);
-
-				pass.SetInt("MaxWidth", data.Item9.x - 1);
-				pass.SetInt("MaxHeight", data.Item9.y - 1);
-
-                if (data.StarMap != null)
-                    pass.SetTexture(StarsId, data.StarMap);
-
-                pass.SetFloat("StarExposure", data.StarExposure);
-            });
-		}
-
-		renderGraph.AddProfileEndPass("Sky");
-	}
+    }
 }

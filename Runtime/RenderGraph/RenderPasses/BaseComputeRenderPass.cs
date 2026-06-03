@@ -3,97 +3,100 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using Unmath;
 
-public abstract class BaseComputeRenderPass<T> : RenderPass<T>
+namespace CustomRenderPipeline
 {
-	protected ComputeShader computeShader;
-	protected int kernelIndex;
-	protected readonly List<(ResourceHandle<RenderTexture>, int, int)> colorBindings = new();
+    public abstract class BaseComputeRenderPass<T> : RenderPass<T>
+    {
+        protected ComputeShader computeShader;
+        protected int kernelIndex;
+        protected readonly List<(ResourceHandle<RenderTexture>, int, int)> colorBindings = new();
 
-	public override void Reset()
-	{
-		base.Reset();
-		colorBindings.Clear();
-	}
+        public override void Reset()
+        {
+            base.Reset();
+            colorBindings.Clear();
+        }
 
-	public void WriteTexture(int propertyId, ResourceHandle<RenderTexture> rtHandle, int mip = 0)
-	{
-		RenderGraph.RtHandleSystem.WriteResource(rtHandle, Index);
-		colorBindings.Add(new(rtHandle, propertyId, mip));
+        public void WriteTexture(int propertyId, ResourceHandle<RenderTexture> rtHandle, int mip = 0)
+        {
+            RenderGraph.RtHandleSystem.WriteResource(rtHandle, Index);
+            colorBindings.Add(new(rtHandle, propertyId, mip));
 
-		var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(rtHandle);
-        descriptor.enableRandomWrite = true;
-		RenderGraph.RtHandleSystem.SetDescriptor(rtHandle, descriptor);
-	}
+            var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(rtHandle);
+            descriptor.enableRandomWrite = true;
+            RenderGraph.RtHandleSystem.SetDescriptor(rtHandle, descriptor);
+        }
 
-	public void WriteTexture(string propertyName, ResourceHandle<RenderTexture> texture, int mip = 0)
-	{
-		WriteTexture(Shader.PropertyToID(propertyName), texture, mip);
-	}
+        public void WriteTexture(string propertyName, ResourceHandle<RenderTexture> texture, int mip = 0)
+        {
+            WriteTexture(Shader.PropertyToID(propertyName), texture, mip);
+        }
 
-	public override void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
-	{
-		Command.SetComputeTextureParam(computeShader, kernelIndex, propertyName, texture, mip, subElement);
-	}
+        public override void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
+        {
+            Command.SetComputeTextureParam(computeShader, kernelIndex, propertyName, texture, mip, subElement);
+        }
 
-	public override void SetBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer)
-	{
-		Command.SetComputeBufferParam(computeShader, kernelIndex, propertyName, GetBuffer(buffer));
-	}
+        public override void SetBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer)
+        {
+            Command.SetComputeBufferParam(computeShader, kernelIndex, propertyName, GetBuffer(buffer));
+        }
 
-	public override void SetVector(int propertyName, Float4 value)
-	{
-		Command.SetComputeVectorParam(computeShader, propertyName, value);
-	}
+        public override void SetVector(int propertyName, Float4 value)
+        {
+            Command.SetComputeVectorParam(computeShader, propertyName, value);
+        }
 
-	public override void SetVectorArray(string propertyName, Vector4[] value)
-	{
-		Command.SetComputeVectorArrayParam(computeShader, propertyName, value);
-	}
+        public override void SetVectorArray(string propertyName, Vector4[] value)
+        {
+            Command.SetComputeVectorArrayParam(computeShader, propertyName, value);
+        }
 
-	public override void SetFloat(string propertyName, float value)
-	{
-		Command.SetComputeFloatParam(computeShader, propertyName, value);
-	}
+        public override void SetFloat(string propertyName, float value)
+        {
+            Command.SetComputeFloatParam(computeShader, propertyName, value);
+        }
 
-	public override void SetFloatArray(string propertyName, float[] value)
-	{
-		Command.SetComputeFloatParams(computeShader, propertyName, value);
-	}
+        public override void SetFloatArray(string propertyName, float[] value)
+        {
+            Command.SetComputeFloatParams(computeShader, propertyName, value);
+        }
 
-	public override void SetInt(string propertyName, int value)
-	{
-		Command.SetComputeIntParam(computeShader, propertyName, value);
-	}
+        public override void SetInt(string propertyName, int value)
+        {
+            Command.SetComputeIntParam(computeShader, propertyName, value);
+        }
 
-	public override void SetMatrix(string propertyName, Matrix4x4 value)
-	{
-		Command.SetComputeMatrixParam(computeShader, propertyName, value);
-	}
+        public override void SetMatrix(string propertyName, Matrix4x4 value)
+        {
+            Command.SetComputeMatrixParam(computeShader, propertyName, value);
+        }
 
-	public override void SetConstantBuffer(string propertyName, ResourceHandle<GraphicsBuffer> value, int size, int offset)
-	{
-		var descriptor = RenderGraph.BufferHandleSystem.GetDescriptor(value);
+        public override void SetConstantBuffer(string propertyName, ResourceHandle<GraphicsBuffer> value, int size, int offset)
+        {
+            var descriptor = RenderGraph.BufferHandleSystem.GetDescriptor(value);
 
-		if(size == 0)
-			size = descriptor.Count * descriptor.Stride;
+            if (size == 0)
+                size = descriptor.Count * descriptor.Stride;
 
-		Command.SetComputeConstantBufferParam(computeShader, propertyName, GetBuffer(value), offset, size);
-	}
+            Command.SetComputeConstantBufferParam(computeShader, propertyName, GetBuffer(value), offset, size);
+        }
 
-	public override void SetMatrixArray(string propertyName, Matrix4x4[] value)
-	{
-		Command.SetComputeMatrixArrayParam(computeShader, propertyName, value);
-	}
+        public override void SetMatrixArray(string propertyName, Matrix4x4[] value)
+        {
+            Command.SetComputeMatrixArrayParam(computeShader, propertyName, value);
+        }
 
-    public sealed override void PostExecute()
-	{
-		foreach (var colorTarget in colorBindings)
-		{
-			var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(colorTarget.Item1);
-			if (descriptor.autoGenerateMips && descriptor.hasMips)
-				Command.GenerateMips(GetRenderTexture(colorTarget.Item1));
-		}
+        public sealed override void PostExecute()
+        {
+            foreach (var colorTarget in colorBindings)
+            {
+                var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(colorTarget.Item1);
+                if (descriptor.autoGenerateMips && descriptor.hasMips)
+                    Command.GenerateMips(GetRenderTexture(colorTarget.Item1));
+            }
 
-		colorBindings.Clear();
-	}
+            colorBindings.Clear();
+        }
+    }
 }

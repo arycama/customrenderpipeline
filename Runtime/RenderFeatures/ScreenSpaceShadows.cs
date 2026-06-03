@@ -3,151 +3,154 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public partial class ScreenSpaceShadows : ViewRenderFeature
+namespace CustomRenderPipeline
 {
-	private readonly Material material;
-	private readonly Settings settings;
-	private readonly LightingSettings lightingSettings;
-	private readonly PersistentRTHandleCache temporalCache;
-	private readonly RayTracingShader shadowRaytracingShader;
-
-	public ScreenSpaceShadows(RenderGraph renderGraph, Settings settings, LightingSettings lightingSettings) : base(renderGraph)
-	{
-		this.settings = settings;
-		this.lightingSettings = lightingSettings;
-		material = new Material(Shader.Find("Hidden/Screen Space Shadows")) { hideFlags = HideFlags.HideAndDontSave };
-		shadowRaytracingShader = Resources.Load<RayTracingShader>("Raytracing/Shadow");
-		temporalCache = new PersistentRTHandleCache(GraphicsFormat.R16_UNorm, renderGraph, "Screen Space Shadows", isScreenTexture: true);
-	}
-
-	protected override void Cleanup(bool disposing)
-	{
-		temporalCache.Dispose();
-	}
-
-	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+    public partial class ScreenSpaceShadows : ViewRenderFeature
     {
-        if (settings.Intensity == 0)
-            return;
+        private readonly Material material;
+        private readonly Settings settings;
+        private readonly LightingSettings lightingSettings;
+        private readonly PersistentRTHandleCache temporalCache;
+        private readonly RayTracingShader shadowRaytracingShader;
 
-		using var scope = renderGraph.AddProfileScope("Screen Space Shadows");
+        public ScreenSpaceShadows(RenderGraph renderGraph, Settings settings, LightingSettings lightingSettings) : base(renderGraph)
+        {
+            this.settings = settings;
+            this.lightingSettings = lightingSettings;
+            material = new Material(Shader.Find("Hidden/Screen Space Shadows")) { hideFlags = HideFlags.HideAndDontSave };
+            shadowRaytracingShader = Resources.Load<RayTracingShader>("Raytracing/Shadow");
+            temporalCache = new PersistentRTHandleCache(GraphicsFormat.R16_UNorm, renderGraph, "Screen Space Shadows", isScreenTexture: true);
+        }
 
-		var tempResult = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+        protected override void Cleanup(bool disposing)
+        {
+            temporalCache.Dispose();
+        }
 
-		if (settings.UseRaytracing)
-		{
-			using var pass = renderGraph.AddRaytracingRenderPass("Raytraced Shadows");
-			var raytracingData = renderGraph.GetResource<RaytracingResult>();
-			pass.Initialize(shadowRaytracingShader, "RayGeneration", "RaytracingVisibility", raytracingData.Rtas, viewPassData.viewSize.x, viewPassData.viewSize.y, 1, raytracingData.Bias, raytracingData.DistantBias, viewPassData.tanHalfFov.y);
-            pass.PreventNewSubPass = true;
+        public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
+        {
+            if (settings.Intensity == 0)
+                return;
 
-            pass.WriteTexture(tempResult, "HitResult");
+            using var scope = renderGraph.AddProfileScope("Screen Space Shadows");
 
-			pass.ReadRtHandle<CameraDepth>();
-			pass.ReadResource<FrameData>();
-			pass.ReadResource<LightingData>();
-			pass.ReadRtHandle<GBufferNormalRoughness>();
-			pass.ReadResource<ViewData>();
+            var tempResult = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
 
-			// Only here to avoid memory leaks due to it not being used..
-			pass.ReadRtHandle<HiZMinDepth>();
-		}
-		else
-		{
-			using var pass = renderGraph.AddFullscreenRenderPass("Screen Space Shadows", (settings.MaxSamples, settings.Thickness, settings.Intensity, viewPassData.viewSize));
-			pass.Initialize(material, viewPassData.viewSize, viewPassData.viewCount, 0, 1, isScreenPass: true);
-            pass.PreventNewSubPass = true;
+            if (settings.UseRaytracing)
+            {
+                using var pass = renderGraph.AddRaytracingRenderPass("Raytraced Shadows");
+                var raytracingData = renderGraph.GetResource<RaytracingResult>();
+                pass.Initialize(shadowRaytracingShader, "RayGeneration", "RaytracingVisibility", raytracingData.Rtas, viewPassData.viewSize.x, viewPassData.viewSize.y, 1, raytracingData.Bias, raytracingData.DistantBias, viewPassData.tanHalfFov.y);
+                pass.PreventNewSubPass = true;
 
-            pass.WriteTexture(tempResult);
-			pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
+                pass.WriteTexture(tempResult, "HitResult");
 
-			pass.ReadRtHandle<CameraDepth>();
-			pass.ReadRtHandle<HiZMinDepth>();
-			pass.ReadResource<LightingData>();
-			pass.ReadResource<ViewData>();
-			pass.ReadResource<FrameData>();
+                pass.ReadRtHandle<CameraDepth>();
+                pass.ReadResource<FrameData>();
+                pass.ReadResource<LightingData>();
+                pass.ReadRtHandle<GBufferNormalRoughness>();
+                pass.ReadResource<ViewData>();
 
-			pass.SetRenderFunction(static (command, pass, data) =>
-			{
-				pass.SetFloat("_MaxSteps", data.MaxSamples);
-				pass.SetFloat("_Thickness", data.Thickness);
-				pass.SetFloat("_Intensity", data.Intensity);
-				pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(data.viewSize) - 1);
-			});
-		}
+                // Only here to avoid memory leaks due to it not being used..
+                pass.ReadRtHandle<HiZMinDepth>();
+            }
+            else
+            {
+                using var pass = renderGraph.AddFullscreenRenderPass("Screen Space Shadows", (settings.MaxSamples, settings.Thickness, settings.Intensity, viewPassData.viewSize));
+                pass.Initialize(material, viewPassData.viewSize, viewPassData.viewCount, 0, 1, isScreenPass: true);
+                pass.PreventNewSubPass = true;
 
-		var spatialResult = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.R16_UNorm, isScreenTexture: true);
-		using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Shadows Spatial", (settings.Intensity, settings.MaxSamples, settings.Thickness, settings.ResolveSamples, settings.ResolveSize)))
-		{
-			pass.Initialize(material, viewPassData.viewSize, viewPassData.viewCount, 1, isScreenPass: true);
-            pass.PreventNewSubPass = true;
-            pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
-			pass.WriteTexture(spatialResult);
+                pass.WriteTexture(tempResult);
+                pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
 
-			pass.ReadTexture("_Input", tempResult);
+                pass.ReadRtHandle<CameraDepth>();
+                pass.ReadRtHandle<HiZMinDepth>();
+                pass.ReadResource<LightingData>();
+                pass.ReadResource<ViewData>();
+                pass.ReadResource<FrameData>();
 
-			pass.ReadResource<TemporalAAData>();
-			pass.ReadResource<SkyReflectionAmbientData>();
-			pass.ReadResource<AtmospherePropertiesAndTables>();
-			pass.ReadResource<AutoExposureData>();
-			pass.ReadResource<ViewData>();
-			pass.ReadRtHandle<CameraVelocity>();
-			pass.ReadRtHandle<CameraDepth>();
-			pass.ReadRtHandle<CameraStencil>();
-			pass.ReadResource<LightingData>();
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    pass.SetFloat("_MaxSteps", data.MaxSamples);
+                    pass.SetFloat("_Thickness", data.Thickness);
+                    pass.SetFloat("_Intensity", data.Intensity);
+                    pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(data.viewSize) - 1);
+                });
+            }
 
-			pass.SetRenderFunction(static (command, pass, data) =>
-			{
-				pass.SetFloat("_Intensity", data.Intensity);
-				pass.SetFloat("_MaxSteps", data.MaxSamples);
-				pass.SetFloat("_Thickness", data.Thickness);
-				pass.SetInt("_ResolveSamples", data.ResolveSamples);
-				pass.SetFloat("_ResolveSize", data.ResolveSize);
-				pass.SetFloat("DiffuseGiStrength", data.Intensity);
-			});
-		}
+            var spatialResult = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.R16_UNorm, isScreenTexture: true);
+            using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Shadows Spatial", (settings.Intensity, settings.MaxSamples, settings.Thickness, settings.ResolveSamples, settings.ResolveSize)))
+            {
+                pass.Initialize(material, viewPassData.viewSize, viewPassData.viewCount, 1, isScreenPass: true);
+                pass.PreventNewSubPass = true;
+                pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
+                pass.WriteTexture(spatialResult);
 
-		bool wasCreated = default;
-		ResourceHandle<RenderTexture> current, history = default;
+                pass.ReadTexture("_Input", tempResult);
 
-		// Write final temporal result out to rgba16 (color+weight) and rgb111110 for final ambient composition
-		using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Shadows Temporal", (wasCreated, history, settings.Intensity, settings.MaxSamples, settings.Thickness)))
-		{
-			 (current, history, wasCreated) = temporalCache.GetTextures(viewPassData.viewSize, pass.Index, viewPassData.viewId);
-			pass.renderData.wasCreated = wasCreated;
-			pass.renderData.history = history;
+                pass.ReadResource<TemporalAAData>();
+                pass.ReadResource<SkyReflectionAmbientData>();
+                pass.ReadResource<AtmospherePropertiesAndTables>();
+                pass.ReadResource<AutoExposureData>();
+                pass.ReadResource<ViewData>();
+                pass.ReadRtHandle<CameraVelocity>();
+                pass.ReadRtHandle<CameraDepth>();
+                pass.ReadRtHandle<CameraStencil>();
+                pass.ReadResource<LightingData>();
 
-			pass.Initialize(material, viewPassData.viewSize, viewPassData.viewCount, 2, isScreenPass: true);
-            pass.PreventNewSubPass = true;
-            pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
-			pass.WriteTexture(current);
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    pass.SetFloat("_Intensity", data.Intensity);
+                    pass.SetFloat("_MaxSteps", data.MaxSamples);
+                    pass.SetFloat("_Thickness", data.Thickness);
+                    pass.SetInt("_ResolveSamples", data.ResolveSamples);
+                    pass.SetFloat("_ResolveSize", data.ResolveSize);
+                    pass.SetFloat("DiffuseGiStrength", data.Intensity);
+                });
+            }
 
-			pass.ReadTexture("_TemporalInput", spatialResult);
-			pass.ReadTexture("_History", history);
-			//pass.ReadTexture("_HitResult", hitResult);
-			//pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
-			//pass.ReadTexture("RayDepth", rayDepth);
+            bool wasCreated = default;
+            ResourceHandle<RenderTexture> current, history = default;
 
-			pass.ReadResource<TemporalAAData>();
-			pass.ReadResource<AutoExposureData>();
-			pass.ReadResource<SkyReflectionAmbientData>();
-			pass.ReadResource<AtmospherePropertiesAndTables>();
-			pass.ReadResource<ViewData>();
-			pass.ReadRtHandle<CameraVelocity>();
-			pass.ReadRtHandle<GBufferNormalRoughness>();
-			pass.ReadRtHandle<CameraDepth>();
-			pass.ReadRtHandle<CameraStencil>();
+            // Write final temporal result out to rgba16 (color+weight) and rgb111110 for final ambient composition
+            using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Shadows Temporal", (wasCreated, history, settings.Intensity, settings.MaxSamples, settings.Thickness)))
+            {
+                (current, history, wasCreated) = temporalCache.GetTextures(viewPassData.viewSize, pass.Index, viewPassData.viewId);
+                pass.renderData.wasCreated = wasCreated;
+                pass.renderData.history = history;
 
-			pass.SetRenderFunction(static (command, pass, data) =>
-			{
-				pass.SetFloat("_IsFirst", data.wasCreated ? 1.0f : 0.0f);
-				pass.SetVector("_HistoryScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.history));
-				pass.SetFloat("_Intensity", data.Intensity);
-				pass.SetFloat("_MaxSteps", data.MaxSamples);
-				pass.SetFloat("_Thickness", data.Thickness);
-			});
-		}
+                pass.Initialize(material, viewPassData.viewSize, viewPassData.viewCount, 2, isScreenPass: true);
+                pass.PreventNewSubPass = true;
+                pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
+                pass.WriteTexture(current);
 
-		renderGraph.SetResource(new Result(current, settings.Intensity));
-	}
+                pass.ReadTexture("_TemporalInput", spatialResult);
+                pass.ReadTexture("_History", history);
+                //pass.ReadTexture("_HitResult", hitResult);
+                //pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
+                //pass.ReadTexture("RayDepth", rayDepth);
+
+                pass.ReadResource<TemporalAAData>();
+                pass.ReadResource<AutoExposureData>();
+                pass.ReadResource<SkyReflectionAmbientData>();
+                pass.ReadResource<AtmospherePropertiesAndTables>();
+                pass.ReadResource<ViewData>();
+                pass.ReadRtHandle<CameraVelocity>();
+                pass.ReadRtHandle<GBufferNormalRoughness>();
+                pass.ReadRtHandle<CameraDepth>();
+                pass.ReadRtHandle<CameraStencil>();
+
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    pass.SetFloat("_IsFirst", data.wasCreated ? 1.0f : 0.0f);
+                    pass.SetVector("_HistoryScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.history));
+                    pass.SetFloat("_Intensity", data.Intensity);
+                    pass.SetFloat("_MaxSteps", data.MaxSamples);
+                    pass.SetFloat("_Thickness", data.Thickness);
+                });
+            }
+
+            renderGraph.SetResource(new Result(current, settings.Intensity));
+        }
+    }
 }

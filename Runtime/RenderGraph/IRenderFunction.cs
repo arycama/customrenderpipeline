@@ -1,6 +1,9 @@
 ﻿using UnityEngine.Rendering;
 
-public interface IRenderFunction
+namespace CustomRenderPipeline
 {
-	public abstract void Execute(CommandBuffer command, RenderPass pass, object data);
+    public interface IRenderFunction
+    {
+        public abstract void Execute(CommandBuffer command, RenderPass pass, object data);
+    }
 }

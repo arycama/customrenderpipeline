@@ -4,76 +4,79 @@ using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 using Unmath;
 
-public abstract class GraphicsRenderPass<T> : RenderPass<T>
+namespace CustomRenderPipeline
 {
-    public override bool IsNativeRenderPass => true;
-
-    public override void Reset()
+    public abstract class GraphicsRenderPass<T> : RenderPass<T>
     {
-        base.Reset();
-        flags = default;
-        DepthSlice = -1;
-        MipLevel = 0;
-        CubemapFace = CubemapFace.Unknown;
-    }
+        public override bool IsNativeRenderPass => true;
 
-    public void WriteRtHandle<K>() where K : IRtHandleId
-    {
-        var handle = RenderGraph.GetRtHandleData<K>().handle;
-        colorTargets.Add(handle);
-        WriteResource(handle);
-    }
-
-    public void WriteRtHandleDepth<K>(SubPassFlags flags = SubPassFlags.None) where K : IRtHandleId
-    {
-        var handle = RenderGraph.GetRtHandleData<K>().handle;
-        this.flags = flags;
-        depthBuffer = handle;
-        WriteResource(handle);
-
-        // Since depth textures are 'read' during rendering for comparisons, we also mark it as read if it's depth or stencil can be modified
-        if (flags != SubPassFlags.ReadOnlyDepthStencil)
-            RenderGraph.RtHandleSystem.ReadResource(handle, Index);
-    }
-
-    public void WriteTexture(ResourceHandle<RenderTexture> rtHandle)
-    {
-        colorTargets.Add(rtHandle);
-        WriteResource(rtHandle);
-    }
-
-    public void WriteDepth(ResourceHandle<RenderTexture> rtHandle, SubPassFlags flags = SubPassFlags.None)
-    {
-        this.flags = flags;
-        depthBuffer = rtHandle;
-        WriteResource(rtHandle);
-
-        // Since depth textures are 'read' during rendering for comparisons, we also mark it as read if it's depth or stencil can be modified
-        if (flags != SubPassFlags.ReadOnlyDepthStencil)
-            RenderGraph.RtHandleSystem.ReadResource(rtHandle, Index);
-    }
-
-    private void WriteResource(ResourceHandle<RenderTexture> rtHandle)
-    {
-        RenderGraph.RtHandleSystem.WriteResource(rtHandle, Index);
-
-        // Check that multiple targets have the same resolution
-        var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(rtHandle);
-
-        // These are if statements/exceptions instead of asserts since they use the pass name to avoid constructing strings every frame and allocating gc
-        if (Size != new Int2(descriptor.width, descriptor.height))
-            throw new InvalidOperationException($"{Name} is attempting to write to a texture whose resolution does not match the pass");
-    }
-
-    public sealed override void PostExecute()
-    {
-        foreach (var colorTarget in colorTargets)
+        public override void Reset()
         {
-            var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(colorTarget);
-            if (descriptor.autoGenerateMips)
+            base.Reset();
+            flags = default;
+            DepthSlice = -1;
+            MipLevel = 0;
+            CubemapFace = CubemapFace.Unknown;
+        }
+
+        public void WriteRtHandle<K>() where K : IRtHandleId
+        {
+            var handle = RenderGraph.GetRtHandleData<K>().handle;
+            colorTargets.Add(handle);
+            WriteResource(handle);
+        }
+
+        public void WriteRtHandleDepth<K>(SubPassFlags flags = SubPassFlags.None) where K : IRtHandleId
+        {
+            var handle = RenderGraph.GetRtHandleData<K>().handle;
+            this.flags = flags;
+            depthBuffer = handle;
+            WriteResource(handle);
+
+            // Since depth textures are 'read' during rendering for comparisons, we also mark it as read if it's depth or stencil can be modified
+            if (flags != SubPassFlags.ReadOnlyDepthStencil)
+                RenderGraph.RtHandleSystem.ReadResource(handle, Index);
+        }
+
+        public void WriteTexture(ResourceHandle<RenderTexture> rtHandle)
+        {
+            colorTargets.Add(rtHandle);
+            WriteResource(rtHandle);
+        }
+
+        public void WriteDepth(ResourceHandle<RenderTexture> rtHandle, SubPassFlags flags = SubPassFlags.None)
+        {
+            this.flags = flags;
+            depthBuffer = rtHandle;
+            WriteResource(rtHandle);
+
+            // Since depth textures are 'read' during rendering for comparisons, we also mark it as read if it's depth or stencil can be modified
+            if (flags != SubPassFlags.ReadOnlyDepthStencil)
+                RenderGraph.RtHandleSystem.ReadResource(rtHandle, Index);
+        }
+
+        private void WriteResource(ResourceHandle<RenderTexture> rtHandle)
+        {
+            RenderGraph.RtHandleSystem.WriteResource(rtHandle, Index);
+
+            // Check that multiple targets have the same resolution
+            var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(rtHandle);
+
+            // These are if statements/exceptions instead of asserts since they use the pass name to avoid constructing strings every frame and allocating gc
+            if (Size != new Int2(descriptor.width, descriptor.height))
+                throw new InvalidOperationException($"{Name} is attempting to write to a texture whose resolution does not match the pass");
+        }
+
+        public sealed override void PostExecute()
+        {
+            foreach (var colorTarget in colorTargets)
             {
-                Assert.IsTrue(descriptor.hasMips, "Trying to Generate Mips for a Texture without mips enabled");
-                Command.GenerateMips(GetRenderTexture(colorTarget));
+                var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(colorTarget);
+                if (descriptor.autoGenerateMips)
+                {
+                    Assert.IsTrue(descriptor.hasMips, "Trying to Generate Mips for a Texture without mips enabled");
+                    Command.GenerateMips(GetRenderTexture(colorTarget));
+                }
             }
         }
     }
