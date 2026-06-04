@@ -16,6 +16,7 @@ Shader "Surface/Grass"
         _Height("Height", Range(0, 1)) = 0.5
         _Bend("Bend", Range(0, 1)) = 0.5
         _Color("Color", Color) = (1, 1, 1, 1)
+        LuminancePower("Luminance Power", Float) = 1
         _Smoothness("Smoothness", Range(0, 1)) = 0.2
 
         TerrainMipBias("Terrain Mip Bias", Float) = 1

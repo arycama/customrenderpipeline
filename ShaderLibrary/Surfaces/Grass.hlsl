@@ -20,7 +20,7 @@ cbuffer UnityPerMaterial
 {
 	float4 _Color;
 	float _Width, _Height, _Smoothness;
-	float WindStrength, WindAngle, WindWavelength, WindSpeed, TerrainMipBias;
+	float WindStrength, WindAngle, WindWavelength, WindSpeed, TerrainMipBias, LuminancePower;
 	float4 AlbedoOpacity_ST;
 };
 
@@ -183,8 +183,8 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	if (!isFrontFace)
 		worldNormal = -worldNormal;
 	
-	float groundFactor = saturate(Remap(input.uv.y, 0.0, 0.5));
-	float3 albedo = lerp(input.colorHueVariation.rgb, saturate(Rec709Luminance(albedoOpacity.rgb) * _Color.rgb * 2), groundFactor);
+	float groundFactor = 1;//	saturate(Remap(input.uv.y, 0.0, 0.5));
+	float3 albedo = lerp(input.colorHueVariation.rgb, pow(Rec709Luminance(albedoOpacity.rgb), LuminancePower) * _Color.rgb, groundFactor);
 	
 	//float3 translucency = Translucency.Sample(SurfaceSampler, uv);
 	//translucency /= Max3(translucency * 2);

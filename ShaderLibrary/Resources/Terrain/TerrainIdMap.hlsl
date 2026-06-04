@@ -65,27 +65,19 @@ uint Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	float layer0Stochastic = BitUnpackFloat(layerData0, 5, 27);
 	float layer0Scale = BitUnpackFloat(layerData0, 5, 12) * 4;
 	
-	uint rand00 = PcgHash2(uv * TerrainSize.xz * layer0Scale);
-	float rotation0 = lerp(terrainAspect, ConstructFloat(rand00), layer0Stochastic);
-	
-	uint rand01 = PcgHash(rand00);
-	float offsetX0 = lerp(0.0, ConstructFloat(rand01), layer0Stochastic);
-	
-	uint rand02 = PcgHash(rand01);
-	float offsetY0 = lerp(0.0, ConstructFloat(rand02), layer0Stochastic);
+	float3 rand0 = Hash32(uv * TerrainSize.xz * layer0Scale);
+	float rotation0 = lerp(terrainAspect, rand0.x, layer0Stochastic);
+	float offsetX0 = lerp(0.0, rand0.y, layer0Stochastic);
+	float offsetY0 = lerp(0.0, rand0.z, layer0Stochastic);
 	
 	uint layerData1 = TerrainLayerData[index1];
 	float layer1Stochastic = BitUnpackFloat(layerData1, 5, 27);
 	float layer1Scale = BitUnpackFloat(layerData1, 5, 12) * 4;
 	
-	uint rand10 = PcgHash2(uv * TerrainSize.xz * layer1Scale);
-	float rotation1 = lerp(terrainAspect, ConstructFloat(rand10), layer1Stochastic);
-	
-	uint rand11 = PcgHash(rand10);
-	float offsetX1 = lerp(0.0, ConstructFloat(rand11), layer1Stochastic);
-	
-	uint rand12 = PcgHash(rand11);
-	float offsetY1 = lerp(0.0, ConstructFloat(rand12), layer1Stochastic);
+	float3 rand1 = Hash32(uv * TerrainSize.xz * layer1Scale);
+	float rotation1 = lerp(terrainAspect, rand1.x, layer1Stochastic);
+	float offsetX1 = lerp(0.0, rand1.y, layer1Stochastic);
+	float offsetY1 = lerp(0.0, rand1.z, layer1Stochastic);
 	
 	uint triplanar;
 	float3 absNormal = abs(terrainNormal);

@@ -123,7 +123,8 @@ float3 EvaluateLight(LightingInput input, float diffuseTerm, float f0Avg, float3
 	
 	half BdotL = saturate(dot(input.bentNormal, L));
 	half microShadow = MicroShadows ? saturate(Sq(BdotL / input.cosVisibilityAngle)) : 1.0;
-	float3 result = WrappedDiffuse(NdotL, input.translucency) * lerp(microShadow, 1.0, input.translucency);
+	float transmission = 0.5 * (WrappedDiffuse(NdotL, 1) + WrappedDiffuse(-NdotL, 1));
+	float3 result = lerp(saturate(NdotL), transmission, input.translucency) * lerp(microShadow, 1.0, input.translucency);
 	result *= diffuseTerm * input.albedo;
 	
 	float LdotV = dot(L, input.V);
