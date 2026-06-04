@@ -20,7 +20,7 @@ namespace CustomRenderPipeline
         private readonly Material generateIdMapMaterial, terrainAmbientOcclusionMaterial;
         private readonly ComputeShader heightmapComputeShader;
 
-        private readonly Dictionary<TerrainLayer, int> terrainLayers = new();
+        public readonly Dictionary<TerrainLayer, int> terrainLayers = new();
 
         private Texture2DArray diffuseArray, normalMapArray, maskMapArray;
 

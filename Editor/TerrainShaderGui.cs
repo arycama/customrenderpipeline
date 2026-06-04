@@ -16,6 +16,7 @@ public class TerrainShaderGui : ShaderGUI, ITerrainLayerCustomUI
 		terrainLayer.normalScale = EditorGUILayout.Slider("Stochastic", terrainLayer.normalScale, 0, 1);
 
         var spec = terrainLayer.specular;
+        spec.r = EditorGUILayout.Toggle("Is Grass", spec.r > 0) ? 1 : 0;
         spec.a = EditorGUILayout.Slider("Translucency", spec.a, 0, 1);
         terrainLayer.specular = spec;
 

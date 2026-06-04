@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
+using UnityEngine.Pool;
 using UnityEngine.Rendering;
 using Unmath;
 
@@ -126,14 +127,33 @@ namespace CustomRenderPipeline
 
                 var viewport = new Rect(new Vector2(region.position.x, resolution - region.position.y - region.size.y), region.size);
 
+                // Create array of layer indices which are grass
+                var grassData = ArrayPool<int>.Get(terrainSystem.terrainLayers.Count);
+                foreach(var layer in terrainSystem.terrainLayers)
+                    grassData[layer.Value] = layer.Key.specular.r > 0 ? 1 : 0;
+
+                var layerGrassBuffer = renderGraph.GetBuffer(terrainSystem.terrainLayers.Count);
+                using (var pass = renderGraph.AddGenericRenderPass("Set Grass Data", (layerGrassBuffer, grassData)))
+                {
+                    pass.WriteBuffer("", layerGrassBuffer);
+                    pass.ReadBuffer("LayerGrassData", layerGrassBuffer);
+
+                    pass.SetRenderFunction(static (command, pass, data) =>
+                    {
+                        command.SetBufferData(pass.GetBuffer(data.layerGrassBuffer), data.grassData);
+                        ArrayPool<int>.Release(data.grassData);
+                    });
+                }
+
                 using (var pass = renderGraph.AddFullscreenRenderPass("Grass Coverage Update", viewport))
                 {
                     pass.Initialize(grassCoverageMaterial, terrain.terrainData.alphamapResolution);
                     pass.WriteTexture(coverageMap);
                     pass.ReadResource<TerrainFrameData>();
                     pass.ReadResource<TerrainViewData>();
+                    pass.ReadBuffer("LayerGrassData", layerGrassBuffer);
 
-                    pass.SetRenderFunction((command, pass, viewport) =>
+                    pass.SetRenderFunction(static (command, pass, viewport) =>
                     {
                         command.EnableScissorRect(viewport);
                     });

@@ -163,6 +163,8 @@ FragmentInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 	output.colorHueVariation.xyz = VirtualTexture.SampleLevel(LinearRepeatSampler, virtualUv, 0);
 	output.colorHueVariation.w = HueVariationFactor(centerPosition + ViewPosition);
 	
+	//output.colorHueVariation.xyz = float3(lod & 1, (lod >> 1) & 1, 0);
+	
 	return output;
 }
 
@@ -182,13 +184,13 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 		worldNormal = -worldNormal;
 	
 	float groundFactor = saturate(Remap(input.uv.y, 0.0, 0.5));
-	float3 albedo = lerp(input.colorHueVariation.rgb, albedoOpacity.rgb, groundFactor);
+	float3 albedo = lerp(input.colorHueVariation.rgb, saturate(Rec709Luminance(albedoOpacity.rgb) * _Color.rgb * 2), groundFactor);
 	
-	float3 translucency = Translucency.Sample(SurfaceSampler, uv);
-	translucency /= Max3(translucency * 2);
-	translucency = lerp(input.colorHueVariation.rgb, translucency, groundFactor);
+	//float3 translucency = Translucency.Sample(SurfaceSampler, uv);
+	//translucency /= Max3(translucency * 2);
+	//translucency = lerp(input.colorHueVariation.rgb, translucency, groundFactor);
 	
-	float4 albedoTranslucency = PackTranslucency(albedo, translucency);
+	float4 albedoTranslucency = float4(albedo, _Color.a);
 	
 	float occlusion = normalOcclusionRoughness.b;
 	float roughness = lerp(normalOcclusionRoughness.a, 0.0, _Smoothness);
