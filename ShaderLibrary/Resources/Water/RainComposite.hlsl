@@ -21,8 +21,8 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float3 worldPosition = worldDir * eyeDepth;
 	float3 rainNormal = UnpackNormalSNorm(RainTexture.Sample(SurfaceSampler, (worldPosition.xz + ViewPosition.xz) / RainTextureSize)).xzy;
 	
-	float3 geoNormal = normalize(cross(ddx(worldPosition), ddy(worldPosition)));
-	float wetLevel = saturate(dot(geoNormal, float3(0, 1, 0))) * WetLevel;
+	float3 geoNormal = normalize(cross(ddx_fine(worldPosition), ddy_fine(worldPosition)));
+	float wetLevel = saturate(Sq(dot(geoNormal, float3(0, 1, 0)))) * WetLevel;
 	float rippleLevel = 0 * saturate(Remap(dot(geoNormal, float3(0, 1, 0)), 0.75, 1.0));
 	rainNormal = lerp(float3(0, 1, 0), rainNormal, rippleLevel);
 	

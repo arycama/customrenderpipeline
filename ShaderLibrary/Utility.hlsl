@@ -3,6 +3,7 @@
 
 #include "Color.hlsl"
 #include "Math.hlsl"
+#include "Random.hlsl"
 
 // TODO: Maybe template these things with macros so we don't have to define half and float types
 // Float
@@ -460,6 +461,94 @@ float2 SmoothstepUv(float2 uv, float2 resolution, float2 rcpResolution)
 	float2 f = p - i;
 	p = i + smoothstep(0.0, 1.0, f);
 	return (p - 0.5) * rcpResolution;
+}
+
+float HashedAlphaThresholdCore(float3 objectPosition, bool isAnisotropic = true)
+{
+	float3 dx = ddx(objectPosition);
+	float3 dy = ddy(objectPosition);
+
+	float2 alpha;
+	float lerpFactor;
+	if (isAnisotropic)
+	{
+		float3 anisoDeriv = max(abs(dx), abs(dy));
+		float3 anisoScales = sqrt(0.5) / anisoDeriv;
+		float3 log2AnisoScales = log2(anisoScales);
+	
+		// Find log-discretized noise scales
+		float3 scaleFlr = exp2(floor(log2AnisoScales));
+		float3 scaleCeil = exp2(ceil(log2AnisoScales));
+	
+		// Compute alpha thresholds at our two noise scales
+		alpha = float2(Hash13(floor(scaleFlr * objectPosition)), Hash13(floor(scaleCeil * objectPosition)));
+	
+		// Factor to linearly interpolate with
+		float3 fracLoc = frac(log2AnisoScales);
+		float2 toCorners = float2(length(fracLoc), length(1.0f - fracLoc));
+		lerpFactor = toCorners.x / (toCorners.x + toCorners.y);
+	}
+	else
+	{
+		float maxDeriv = max(length(dx), length(dy));
+		float logPixScale = -log2(maxDeriv);
+	
+		// Find two nearest log-discretized noise scales
+		float2 pixScales = exp2(float2(floor(logPixScale), ceil(logPixScale)));
+	
+		// Compute alpha thresholds at our two noise scales
+		alpha = float2(Hash13(floor(pixScales.x * objectPosition)), Hash13(floor(pixScales.y * objectPosition)));
+	
+		// Factor to linearly interpolate with
+		lerpFactor = frac(logPixScale);
+	}
+	
+	// Interpolate alpha threshold from noise at two scales
+	float x = lerp(alpha.x, alpha.y, lerpFactor);
+	
+	// Pass into CDF to compute uniformly distrib threshold
+	float a = min(lerpFactor, 1 - lerpFactor);
+	float3 cases = float3(x * x / (2 * a * (1 - a)), (x - 0.5 * a) / (1 - a), 1.0 - ((1 - x) * (1 - x) / (2 * a * (1 - a))));
+	
+	// Find our final, uniformly distributed alpha threshold
+	float threshold = (x < (1 - a)) ? ((x < a) ? cases.x : cases.y) : cases.z;
+	
+	return clamp(threshold, 1e-6, 1);
+}
+
+float HashedAlphaThresholdFade(float threshold, float2 uv, float2 resolution, float fullNoiseMip = 3.0)
+{
+	float2 dxUv = ddx(uv);
+	float2 dyUv = ddy(uv);
+		
+	float mip = CalculateMipLevel(dxUv, dyUv, resolution);
+		
+	float2 dTex = float2(length(dxUv), length(dyUv));
+	float aniso = max(dTex.x / dTex.y, dTex.y / dTex.x);
+		
+	// Modify inputs to b(x) based on degree of aniso
+	mip = aniso * mip;
+		
+	float b = fullNoiseMip >= 0.0 ? (mip <= 0.0 ? 0.0 : (mip < fullNoiseMip ? Sq(mip / fullNoiseMip) : 1.0)) : 1.0;
+	threshold = 0.5 + (threshold - 0.5) * b;
+	return threshold;
+}
+
+float HashedAlphaThreshold(float3 objectPosition, float2 uv, float2 resolution, bool isAnisotropic = true, float fullNoiseMip = 3.0)
+{
+	float threshold = HashedAlphaThresholdCore(objectPosition, isAnisotropic);
+	return HashedAlphaThresholdFade(threshold, uv, resolution, fullNoiseMip);
+}
+
+float HashedAlphaThresholdTemporal(float3 objectPosition, float2 uv, float2 resolution, float frameIndex, float frameCount, bool isAnisotropic = true, float fullNoiseMip = 3.0)
+{
+	float threshold = HashedAlphaThresholdCore(objectPosition, isAnisotropic);
+	
+	float i = Mod(frameIndex, frameCount);
+	float j = floor(i * 0.5) + Mod(i, 2) * frameCount * 0.5;
+	threshold = frac(threshold + j / frameCount);
+	
+	return HashedAlphaThresholdFade(threshold, uv, resolution, fullNoiseMip);
 }
 
 #endif

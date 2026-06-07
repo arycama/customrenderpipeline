@@ -136,7 +136,7 @@ FragmentOutput FragmentCombine(FragmentInput input)
 	output.output[0] = Input0[pos];
 	output.output[1] = Input1[pos];
 	output.output[2] = Input2[pos];
-	output.output[3] = height >= Cutoff;
+	output.output[3] = height;// >= Cutoff;
 	output.output[4] = Input4[pos];
 	output.output[5] = Input5[pos];
 	output.output[6] = Input6[pos];

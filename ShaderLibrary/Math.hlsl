@@ -39,6 +39,11 @@ float2 Cb(float2 x) { return x * x * x; }
 float3 Cb(float3 x) { return x * x * x; }
 float4 Cb(float4 x) { return x * x * x; }
 
+float1 Mod(float1 x, float1 y) { return frac(x / y) * y; }
+float2 Mod(float2 x, float2 y) { return frac(x / y) * y; }
+float3 Mod(float3 x, float3 y) { return frac(x / y) * y; }
+float4 Mod(float4 x, float4 y) { return frac(x / y) * y; }
+
 float1 InvLerp(float1 t, float1 x, float1 y) { return (t - x) * rcp(y - x); }
 float2 InvLerp(float2 t, float2 x, float2 y) { return (t - x) * rcp(y - x); }
 float3 InvLerp(float3 t, float3 x, float3 y) { return (t - x) * rcp(y - x); }

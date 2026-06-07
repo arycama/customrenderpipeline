@@ -32,9 +32,6 @@ float3 Fragment(VertexFullscreenTriangleOutput input) : SV_Target
 	float3 bentNormal = GBufferNormal(bentNormalOcclusion, V, WorldToView, ViewToWorld);
 	float cosVisibilityAngle = bentNormalOcclusion.b;
 	
-	float curvature = length(fwidth(normal)) / length(fwidth(worldPosition));
-	//return curvature;
-	
 	#ifdef TRANSLUCENCY
 		if (!(stencil & 16))
 			albedoMetallic.ba = 0.0;
