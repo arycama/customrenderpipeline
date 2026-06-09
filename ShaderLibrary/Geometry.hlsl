@@ -273,13 +273,6 @@ float3 SampleHemisphereCosine(float2 u)
 	return SphericalToCartesian(phi, cosTheta);
 }
 
-// Generates a sample, then rotates it into the hemisphere of normal using reoriented normal mapping
-float3 SampleHemisphereCosine(float2 u, float3 normal)
-{
-	float3 result = SampleHemisphereCosine(u);
-	return FromToRotationZ(normal, result, false);
-}
-
 float3 SampleHemisphereUniform(float2 u)
 {
 	return SphericalToCartesian(TwoPi * u.y, u.x);
@@ -290,6 +283,24 @@ float3 SampleSphereUniform(float2 u)
 	float phi = TwoPi * u.y;
 	float cosTheta = 2.0 * u.x - 1.0;
 	return SphericalToCartesian(phi, cosTheta);
+}
+
+// Generates a uniform sample within the hemisphere of the normal
+float3 SampleHemisphereUniform(float2 u, float3 n)
+{
+	float3 p = SampleSphereUniform(u);
+	float d = dot(n, p);
+	float3 t = p - n * d;
+	return n * abs(d) + t;
+}
+
+// Generates cosine-weighted sample within the hemisphere of the normal
+float3 SampleHemisphereCosine(float2 u, float3 n)
+{
+	float3 p = SampleSphereUniform(u);
+	float d = dot(n, p);
+	float3 t = (p - n * d) * rsqrt(1.0 + abs(d));
+	return n * sqrt(abs(d)) + t;
 }
 
 // ref http://blog.selfshadow.com/publications/blending-in-detail/

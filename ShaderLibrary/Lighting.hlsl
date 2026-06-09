@@ -335,7 +335,7 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 	float3 radiance = SkyReflection.SampleLevel(TrilinearClampSampler, skyUv, environmentMip) * rStrength;
 	
 	float BdotR = dot(input.bentNormal, R);
-	float specularOcclusion = GetSpecularOcclusion(input.cosVisibilityAngle, BdotR, input.perceptualRoughness, dot(input.N, R));
+	float specularOcclusion = GetSpecularOcclusion(input.cosVisibilityAngle, BdotR, input.perceptualRoughness, input.NdotV);
 	radiance *= specularOcclusion;
 	
 	#ifdef UNDERWATER_LIGHTING_ON
@@ -346,7 +346,7 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 		float3 ssr = R10G10B10A2UnormToFloat(ScreenSpaceReflections[pixelCoordinate]).rgb;
 		ssr = OffsetICtCpToRec2020(ssr) / (PaperWhite * sqrt(2.0));
 		float ssrStrength = ScreenSpaceReflectionsOpacity[pixelCoordinate];
-		radiance = lerp(radiance * specularOcclusion, ssr.rgb, ssrStrength * SpecularGiStrength);
+		radiance = lerp(radiance, ssr.rgb, ssrStrength * SpecularGiStrength);
 	#endif
 
 	float3 environmentWeight = dfg.x * input.reflectivity + dfg.y;
@@ -379,27 +379,6 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 	half eta = ReflectivityToIorRatio(input.reflectivity).r;
 	half sinThetaSq = Sq(eta) * (1.0h - Sq(input.NdotV));
 	opacity = (input.NdotV <= 0.0h && sinThetaSq >= 1.0h) ? 1.0h : opacity;
-	
-	half3 refractDirection = -input.V;
-	if (input.NdotV <= 0.0h)
-		refractDirection = eta * refractDirection + (eta * -input.NdotV - sqrt(1.0h - sinThetaSq)) * -input.N;
-	
-	half3 environmentRefraction;
-	//if (input.refractedEnvironment)
-	//{
-	//	float linearHitDepth = LinearEyeDepth(CameraDepth[pixelCoordinate]);
-	//	float hitDist = linearHitDepth;
-	//	float coneTangent = GetSpecularLobeTanHalfAngle(input.roughness);
-	//	coneTangent *= lerp(saturate(input.NdotV * 2), 1, sqrt(input.roughness));
-	//	float mipLevel = log2(ViewSize.y * 0.5 * coneTangent * hitDist / (linearHitDepth * TanHalfFov));
-			
-	//	environmentRefraction = SceneColor.SampleLevel(TrilinearClampSampler, (pixelCoordinate + 0.5) / ViewSize, mipLevel);
-	//}
-	//else
-	{
-		half2 refractUv = NormalToOctahedralUv(refractDirection);
-		environmentRefraction = SkyReflection.SampleLevel(TrilinearClampSampler, refractUv, environmentMip);
-	}
 	
 	//luminance += input.specularOpacity * (1.0 - opacity) * specularOcclusion * environmentRefraction;
 	opacity = lerp(0.0, opacity, input.specularOpacity);

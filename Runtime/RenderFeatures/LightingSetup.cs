@@ -344,7 +344,7 @@ namespace CustomRenderPipeline
             for (var i = FrustumPlane.Left; i < FrustumPlane.Count; i++)
             {
                 var plane = viewProjectionMatrix.GetFrustumPlane(i);
-                if (plane.xyz.Dot(forward) < 0.0f)
+                if (plane.normal.Dot(forward) < 0.0f)
                     shadowSplitData.SetCullingPlane(shadowSplitData.cullingPlaneCount++, plane);
             }
 

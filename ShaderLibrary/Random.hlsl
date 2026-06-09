@@ -155,14 +155,14 @@ float InterleavedGradientNoise(float2 pixCoord, int frameCount)
 }
 
 // Ref: http://holger.dammertz.org/stuff/notes_HammersleyOnHemisphere.html
-float VanDerCorputBase2(uint i)
+float VanDerCorputBase2(float i)
 {
-	return reversebits(i) * 2.3283064365386963e-10;
+	return reversebits(i) * asfloat(0x2F800000);
 }
 
-float2 Hammersley2dSeq(uint i, uint sequenceLength)
+float2 Hammersley2dSeq(float i, float sequenceLength)
 {
-	return float2(float(i) / float(sequenceLength), VanDerCorputBase2(i));
+	return float2(i / sequenceLength, VanDerCorputBase2(i));
 }
 
 float PlusNoise(float2 p, float frameIndex)

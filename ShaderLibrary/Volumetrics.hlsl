@@ -57,7 +57,7 @@ float3 ScatterFromAlbedoExtinction(float3 albedo, float3 extinction)
 
 float AbsorptionFromAlbedoExtinction(float albedo, float extinction)
 {
-	return extinction - ScatterFromAlbedoExtinction(albedo, extinction);
+	return extinction - ScatterFromAlbedoExtinction(albedo, extinction).r;
 }
 
 float CombineAlbedo(float albedo0, float extinction0, float albedo1, float extinction1)
@@ -90,9 +90,9 @@ float3 ImportanceSampleInfinite(float xi, float3 c)
 	return -log(1.0 - xi) / c;
 }
 
-float ImportanceSampleInfinite(float xi, float3 c, out float3 pdf)
+float ImportanceSampleInfinite(float xi, float c, out float3 pdf)
 {
-	float t = ImportanceSampleInfinite(xi, c);
+	float t = ImportanceSampleInfinite(xi, c).r;
 	pdf = ImportanceSampleInfinitePdf(t, c);
 	return t;
 }
@@ -106,7 +106,7 @@ float ImportanceSampleInfiniteHeroWavelength(float2 xi, float3 extinction, float
 	return t;
 }
 
-float3 ImportanceSampleBoundedPdf(float t, float3 c, float b)
+float3 ImportanceSampleBoundedPdf(float3 t, float3 c, float b)
 {
 	return c * exp(c * (b - t)) / (exp(c * b) - 1.0);
 }
@@ -116,9 +116,9 @@ float3 ImportanceSampleBounded(float xi, float3 c, float b)
 	return -log(1.0 - xi * (1.0 - exp(-c * b))) / c;
 }
 
-float ImportanceSampleBounded(float xi, float3 c, float b, out float3 pdf)
+float3 ImportanceSampleBounded(float xi, float3 c, float b, out float3 pdf)
 {
-	float t = ImportanceSampleBounded(xi, c, b);
+	float3 t = ImportanceSampleBounded(xi, c, b);
 	pdf = ImportanceSampleBoundedPdf(t, c, b);
 	return t;
 }
@@ -127,7 +127,7 @@ float ImportanceSampleBoundedHeroWavelength(float2 xi, float3 extinction, float 
 {
 	float c = xi.x > channelProbability.x ? extinction.r : (xi.x > (channelProbability.x + channelProbability.y) ? extinction.g : extinction.b);
 	float3 pdf;
-	float t = ImportanceSampleBounded(xi.y, c, b, pdf);
+	float t = ImportanceSampleBounded(xi.y, c, b, pdf).r;
 	weightOverPdf = extinction * exp(-t * extinction) / PdfHeroWavelength(pdf, channelProbability);
 	return t;
 }
