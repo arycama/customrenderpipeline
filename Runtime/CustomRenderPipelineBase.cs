@@ -7,6 +7,10 @@ using System;
 using UnityEngine.Pool;
 using Unmath;
 
+#if ENABLE_XR_MODULE
+using UnityEngine.XR;
+#endif
+
 #if UNITY_EDITOR
 using UnityEditorInternal;
 #endif
@@ -107,9 +111,9 @@ namespace CustomRenderPipeline
             var displayOutputDatasCount = 1;
 
 #if ENABLE_XR_MODULE
-        var xrDisplaySubsystems = ListPool<XRDisplaySubsystem>.Get();
-        SubsystemManager.GetSubsystems(xrDisplaySubsystems);
-        displayOutputDatasCount += xrDisplaySubsystems.Count;
+            var xrDisplaySubsystems = ListPool<XRDisplaySubsystem>.Get();
+            SubsystemManager.GetSubsystems(xrDisplaySubsystems);
+            displayOutputDatasCount += xrDisplaySubsystems.Count;
 #endif
 
             // Setup display output infos
@@ -121,22 +125,22 @@ namespace CustomRenderPipeline
             displayOutputDatas[0] = new(mainColorGamut, mainPeakLuminance, mainHdrSettings.available);
 
 #if ENABLE_XR_MODULE
-        for (var i = 0; i < xrDisplaySubsystems.Count; i++)
-        {
-            var xrDisplaySubsystem = xrDisplaySubsystems[i];
+            for (var i = 0; i < xrDisplaySubsystems.Count; i++)
+            {
+                var xrDisplaySubsystem = xrDisplaySubsystems[i];
 
-            // TODO: How can we do this just one instead of every frame? We cant' do it on init since the subsystem creation is delayed
-            xrDisplaySubsystem.disableLegacyRenderer = true;
-            xrDisplaySubsystem.scaleOfAllRenderTargets = RenderScale;
-            xrDisplaySubsystem.sRGB = true;
-            xrDisplaySubsystem.textureLayout = XRDisplaySubsystem.TextureLayout.Texture2DArray;
-            xrDisplaySubsystem.SetMSAALevel(AntiAliasing);
+                // TODO: How can we do this just one instead of every frame? We cant' do it on init since the subsystem creation is delayed
+                xrDisplaySubsystem.disableLegacyRenderer = true;
+                xrDisplaySubsystem.scaleOfAllRenderTargets = RenderScale;
+                xrDisplaySubsystem.sRGB = true;
+                xrDisplaySubsystem.textureLayout = XRDisplaySubsystem.TextureLayout.Texture2DArray;
+                xrDisplaySubsystem.SetMSAALevel(AntiAliasing);
 
-            var hdrSettings = xrDisplaySubsystem.hdrOutputSettings;
-            var colorGamut = hdrSettings.available ? hdrSettings.displayColorGamut : ColorGamut.sRGB;
-            var peakLuminance = hdrSettings.available ? hdrSettings.maxToneMapLuminance : SdrLuminance;
-            displayOutputDatas[i + 1] = new(colorGamut, peakLuminance, hdrSettings.available);
-        }
+                var hdrSettings = xrDisplaySubsystem.hdrOutputSettings;
+                var colorGamut = hdrSettings.available ? hdrSettings.displayColorGamut : ColorGamut.sRGB;
+                var peakLuminance = hdrSettings.available ? hdrSettings.maxToneMapLuminance : SdrLuminance;
+                displayOutputDatas[i + 1] = new(colorGamut, peakLuminance, hdrSettings.available);
+            }
 #endif
 
             // TODO: Convert these to spans? Will require doing two passes though, one to calculate count, and one to actually do the thing
@@ -214,40 +218,40 @@ namespace CustomRenderPipeline
                 }
 
 #if ENABLE_XR_MODULE
-            // Only cameras with no target texture output to the display
-            if (camera.targetTexture == null && xrDisplaySubsystems.Count > 0)
-            {
-                for (var i = 0; i < xrDisplaySubsystems.Count; i++)
+                // Only cameras with no target texture output to the display
+                if (camera.targetTexture == null && xrDisplaySubsystems.Count > 0)
                 {
-                    var xrDisplaySubsystem = xrDisplaySubsystems[i];
-                    var mirrorBlitMode = xrDisplaySubsystem.GetPreferredMirrorBlitMode();
-
-                    var passCount = xrDisplaySubsystem.GetRenderPassCount();
-                    for (var j = 0; j < passCount; j++)
+                    for (var i = 0; i < xrDisplaySubsystems.Count; i++)
                     {
-                        xrDisplaySubsystem.GetRenderPass(j, out var renderPass);
-                        xrDisplaySubsystem.GetCullingParameters(camera, renderPass.cullingPassIndex, out var cullingParameters);
+                        var xrDisplaySubsystem = xrDisplaySubsystems[i];
+                        var mirrorBlitMode = xrDisplaySubsystem.GetPreferredMirrorBlitMode();
 
-                        // TODO: Any reason to not use renderTargetDesc.width and height?
-                        var size = new Int2(renderPass.renderTargetScaledWidth, renderPass.renderTargetScaledHeight);
-                        renderGraph.RtHandleSystem.SetScreenSize(size.x, size.y);
-
-                        var renderTargetDesc = renderPass.renderTargetDesc;
-                        var viewCount = renderPass.GetRenderParameterCount();
-
-                        var isFlipped = renderTargetDesc.flags.HasFlag(RenderTextureCreationFlags.AllowVerticalFlip);
-                        var displayRenderPass = GetDisplayRenderPass(i + 1, viewCount, isFlipped, size, renderPass.renderTarget, renderTargetDesc.graphicsFormat, renderTargetDesc.vrUsage, cullingParameters, mirrorBlitMode, renderPass.foveatedRenderingInfo);
-                        viewPassDatas.Add(displayRenderPass);
-
-                        for (var k = 0; k < viewCount; k++)
+                        var passCount = xrDisplaySubsystem.GetRenderPassCount();
+                        for (var j = 0; j < passCount; j++)
                         {
-                            renderPass.GetRenderParameter(camera, k, out var renderParameter);
-                            AddViewParameter(new(renderParameter.view, renderParameter.projection));
+                            xrDisplaySubsystem.GetRenderPass(j, out var renderPass);
+                            xrDisplaySubsystem.GetCullingParameters(camera, renderPass.cullingPassIndex, out var cullingParameters);
+
+                            // TODO: Any reason to not use renderTargetDesc.width and height?
+                            var size = new Int2(renderPass.renderTargetScaledWidth, renderPass.renderTargetScaledHeight);
+                            renderGraph.RtHandleSystem.SetScreenSize(size.x, size.y);
+
+                            var renderTargetDesc = renderPass.renderTargetDesc;
+                            var viewCount = renderPass.GetRenderParameterCount();
+
+                            var isFlipped = renderTargetDesc.flags.HasFlag(RenderTextureCreationFlags.AllowVerticalFlip);
+                            var displayRenderPass = GetDisplayRenderPass(i + 1, viewCount, isFlipped, size, renderPass.renderTarget, renderTargetDesc.graphicsFormat, renderTargetDesc.vrUsage, cullingParameters, mirrorBlitMode, renderPass.foveatedRenderingInfo);
+                            viewPassDatas.Add(displayRenderPass);
+
+                            for (var k = 0; k < viewCount; k++)
+                            {
+                                renderPass.GetRenderParameter(camera, k, out var renderParameter);
+                                AddViewParameter(new(renderParameter.view, renderParameter.projection));
+                            }
                         }
                     }
                 }
-            }
-            else
+                else
 #endif
                 {
                     if (!camera.TryGetCullingParameters(out var cullingParameters))
@@ -276,7 +280,7 @@ namespace CustomRenderPipeline
             }
 
 #if ENABLE_XR_MODULE
-        ListPool<XRDisplaySubsystem>.Release(xrDisplaySubsystems);
+            ListPool<XRDisplaySubsystem>.Release(xrDisplaySubsystems);
 #endif
 
             using (renderGraph.AddProfileScope("Prepare Frame"))
