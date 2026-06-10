@@ -64,8 +64,6 @@ float3 ColorGrade(float3 color, float exposure, float contrast, float3 filter, f
 	xyz = mul(adaptation, xyz);
 	color = XYZToRec2020(xyz);
 	
-	return color;
-	
 	// Split toning (TODO: Doesn't quite work in HDR)
 	float t = saturate(Rec2020Luminance(color) / paperWhite + splitToneBalance);
 	float3 shadow = lerp(0.5, splitToneShadows, 1.0 - t);
