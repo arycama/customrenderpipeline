@@ -28,14 +28,14 @@ public class TextureGenerator : ScriptableWizard
     private void Generate()
     {
         var path = EditorPrefs.GetString("TextureGeneratorPath");
-        path = EditorUtility.SaveFilePanelInProject("Title", Path.GetFileName(path), "exr", "message", path);
+        path = EditorUtility.SaveFilePanelInProject("Title", Path.GetFileName(path), "png", "message", path);
 
         if (string.IsNullOrEmpty(path))
             return;
 
         EditorPrefs.SetString("TextureGeneratorPath", path);
 
-        var target = new RenderTexture(resolution, resolution, 0, GraphicsFormat.R32G32B32A32_SFloat);
+        var target = new RenderTexture(resolution, resolution, 0, GraphicsFormat.R8G8B8A8_SRGB);
         var command = new CommandBuffer();
 
         command.SetRenderTarget(target);
@@ -43,10 +43,10 @@ public class TextureGenerator : ScriptableWizard
         command.RequestAsyncReadback(target, readback =>
         {
             target.Release();
-            //var pngBytes = ImageConversion.EncodeNativeArrayToPNG(readback.GetData<byte>(), GraphicsFormat.R8G8B8A8_SRGB, (uint)resolution, (uint)resolution);
-            var exrBytes = ImageConversion.EncodeNativeArrayToEXR(readback.GetData<byte>(), GraphicsFormat.R32G32B32A32_SFloat, (uint)resolution, (uint)resolution, flags: Texture2D.EXRFlags.OutputAsFloat);
+            var pngBytes = ImageConversion.EncodeNativeArrayToPNG(readback.GetData<byte>(), GraphicsFormat.R8G8B8A8_SRGB, (uint)resolution, (uint)resolution);
+            //var exrBytes = ImageConversion.EncodeNativeArrayToEXR(readback.GetData<byte>(), GraphicsFormat.R32G32B32A32_SFloat, (uint)resolution, (uint)resolution, flags: Texture2D.EXRFlags.OutputAsFloat);
 
-            File.WriteAllBytes(path, exrBytes.ToArray());
+            File.WriteAllBytes(path, pngBytes.ToArray());
             AssetDatabase.Refresh();
         });
 

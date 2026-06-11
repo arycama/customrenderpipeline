@@ -28,14 +28,14 @@ namespace CustomRenderPipeline
             [field: SerializeField, Range(0, 1)] public float SplitToneBalance { get; private set; } = 0.5f;
             [field: SerializeField, ColorUsage(false)] public Color SplitToneHighlights { get; private set; } = Color.gray;
             [field: Header("Channel Mixing")]
-            [field: SerializeField] public Float3 ChannelMixerRed { get; private set; } = Float3.Right;
-            [field: SerializeField] public Float3 ChannelMixerGreen { get; private set; } = Float3.Up;
-            [field: SerializeField] public Float3 ChannelMixerBlue { get; private set; } = Float3.Forward;
+            [field: SerializeField, ColorUsage(false)] public Color ChannelMixerRed { get; private set; } = new(0.5f, 0, 0);
+            [field: SerializeField, ColorUsage(false)] public Color ChannelMixerGreen { get; private set; } = new(0, 0.5f, 0);
+            [field: SerializeField, ColorUsage(false)] public Color ChannelMixerBlue { get; private set; } = new(0, 0, 0.5f);
 
             [field: Header("Shadows, Midtones, Highlights")]
-            [field: SerializeField, ColorUsage(false)] public Color Shadows { get; private set; } = Color.white;
-            [field: SerializeField, ColorUsage(false)] public Color Midtones { get; private set; } = Color.white;
-            [field: SerializeField, ColorUsage(false)] public Color Highlights { get; private set; } = Color.white;
+            [field: SerializeField, ColorUsage(false)] public Color Shadows { get; private set; } = Color.gray;
+            [field: SerializeField, ColorUsage(false)] public Color Midtones { get; private set; } = Color.gray;
+            [field: SerializeField, ColorUsage(false)] public Color Highlights { get; private set; } = Color.gray;
             [field: SerializeField, Range(0f, 2f)] public float ShadowsStart { get; private set; } = 0.0f;
             [field: SerializeField, Range(0f, 2f)] public float ShadowsEnd { get; private set; } = 0.3f;
             [field: SerializeField, Range(0f, 2f)] public float HighlightsStart { get; private set; } = 0.55f;
@@ -118,22 +118,22 @@ namespace CustomRenderPipeline
                 settings.SplitToneHighlights.LinearFloat3(),
                 settings.Saturation,
 
-                settings.ChannelMixerRed,
+                settings.ChannelMixerRed.Float3(),
                 settings.WhiteBalance,
 
-                settings.ChannelMixerGreen,
+                settings.ChannelMixerGreen.Float3(),
                 settings.Tint,
 
-                settings.ChannelMixerBlue,
+                settings.ChannelMixerBlue.Float3(),
                 settings.SplitToneBalance,
 
-                settings.Shadows.LinearFloat3(),
+                settings.Shadows.Float3(),
                 settings.ShadowsStart,
 
-                settings.Midtones.LinearFloat3(),
+                settings.Midtones.Float3(),
                 settings.ShadowsEnd,
 
-                settings.Highlights.LinearFloat3(),
+                settings.Highlights.Float3(),
                 settings.HighlightsStart,
 
                 Float3.Zero,

@@ -44,7 +44,7 @@ float3 ColorGrade(float3 color, float exposure, float contrast, float3 filter, f
 	color *= exp2(exposure);
 	
 	// Contrast. TODO: Not sure if this should be revised with Rec2020/ICtCp/HDR
-	color = EvalLogContrastFunc(color, log2(100), contrast * 2);
+	color = EvalLogContrastFunc(color, log2(paperWhite * 0.18), contrast * 2);
 	
 	// Color filter
 	color *= filter;
@@ -52,8 +52,9 @@ float3 ColorGrade(float3 color, float exposure, float contrast, float3 filter, f
 	// Hue saturation (TODO: Is there a way to make this work better with rec2020)
 	color = RgbToHsl(color);
 	color.x = frac(color.x + hue - 0.5);
-	color.y = (color.y * (saturation * 2));
 	color = HslToRgb(color);
+	
+	color = max(0.0, lerp(Rec2020Luminance(color), color, saturation * 2));
 	
 	// White balance and Tint
 	float2 srcXy = ColorTemperatureToXy(whiteBalance, tint);
@@ -62,7 +63,7 @@ float3 ColorGrade(float3 color, float exposure, float contrast, float3 filter, f
 	
 	float3 xyz = Rec2020ToXYZ(color);
 	xyz = mul(adaptation, xyz);
-	color = XYZToRec2020(xyz);
+	color = max(0.0, XYZToRec2020(xyz));
 	
 	// Split toning (TODO: Doesn't quite work in HDR)
 	float t = saturate(Rec2020Luminance(color) / paperWhite + splitToneBalance);
@@ -73,17 +74,16 @@ float3 ColorGrade(float3 color, float exposure, float contrast, float3 filter, f
 	
 	// Channel mixer
 	float3x3 channelMixer = float3x3(channelMixerRed, channelMixerGreen, channelMixerBlue);
-	color = mul(channelMixer, color);
+	color = max(0.0, mul(channelMixer, color));
 	
 	// Shadows midtones highlights
 	float luminance = Rec2020Luminance(color);
-	float shadowsWeight = 1.0 - smoothstep(shadowsStart * paperWhite, shadowsEnd * paperWhite, luminance);
+	
+	float shadowsWeight = smoothstep(shadowsEnd * paperWhite, shadowsStart * paperWhite, luminance);
 	float highlightsWeight = smoothstep(highlightsStart * paperWhite, highlightsEnd * paperWhite, luminance);
 	float midtonesWeight = 1.0 - shadowsWeight - highlightsWeight;
-	color =
-		color * shadows * shadowsWeight +
-		color * midtones * midtonesWeight +
-		color * highlights * highlightsWeight;
+	
+	color = color * (shadows * shadowsWeight + midtones * midtonesWeight + highlights * highlightsWeight);
 	
 	return color;
 }

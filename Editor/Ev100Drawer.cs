@@ -1,21 +1,16 @@
 using UnityEditor;
 using UnityEngine;
-using Unmath;
 
-public class Exp2Drawer : MaterialPropertyDrawer
+public class Ev100Drawer : MaterialPropertyDrawer
 {
     public override void OnGUI(Rect position, MaterialProperty prop, string label, MaterialEditor editor)
     {
-        // Convert the current shader value back to exponent for display
-        var currentExponent = prop.floatValue != 0 ? Math.Log2(prop.floatValue) : 0;
-
         EditorGUI.BeginChangeCheck();
 
+        var currentExponent = prop.floatValue != 0 ? PhysicalCameraUtility.LuminanceToEV100(prop.floatValue) : 0;
         var newExponent = EditorGUI.FloatField(position, label, currentExponent);
 
         if (EditorGUI.EndChangeCheck())
-        {
-            prop.floatValue = Math.Exp2(newExponent);
-        }
+            prop.floatValue = PhysicalCameraUtility.EV100ToLuminance(newExponent);
     }
 }
