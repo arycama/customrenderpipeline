@@ -302,6 +302,9 @@ namespace CustomRenderPipeline
             if (pass.OutputsToCameraTarget)
             {
                 outputs.Add(new(default, pass.FrameBufferTarget, pass.FrameBufferFormat, true, 0, CubemapFace.Unknown, -1));
+
+                if(pass.depthBuffer.HasValue)
+                    subPassDepth = new(pass.depthBuffer.Value, default, default, false, 0, CubemapFace.Unknown, -1);
             }
             else
             {

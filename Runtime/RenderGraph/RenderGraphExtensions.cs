@@ -22,6 +22,7 @@ namespace CustomRenderPipeline
         public static GenericRenderPass<T> AddGenericRenderPass<T>(this RenderGraph renderGraph, string name, T data) => renderGraph.AddRenderPass<GenericRenderPass<T>, T>(name, data);
         public static IndirectComputeRenderPass<T> AddIndirectComputeRenderPass<T>(this RenderGraph renderGraph, string name, T data) => renderGraph.AddRenderPass<IndirectComputeRenderPass<T>, T>(name, data);
         public static ObjectRenderPass<T> AddObjectRenderPass<T>(this RenderGraph renderGraph, string name, T data) => renderGraph.AddRenderPass<ObjectRenderPass<T>, T>(name, data);
+        public static ObjectScreenRenderPass<T> AddObjectScreenRenderPass<T>(this RenderGraph renderGraph, string name, T data) => renderGraph.AddRenderPass<ObjectScreenRenderPass<T>, T>(name, data);
         public static RaytracingRenderPass<T> AddRaytracingRenderPass<T>(this RenderGraph renderGraph, string name, T data) => renderGraph.AddRenderPass<RaytracingRenderPass<T>, T>(name, data);
         public static ShadowRenderPass<T> AddShadowRenderPass<T>(this RenderGraph renderGraph, string name, T data) => renderGraph.AddRenderPass<ShadowRenderPass<T>, T>(name, data);
 
@@ -37,6 +38,7 @@ namespace CustomRenderPipeline
         public static GenericRenderPass<int> AddGenericRenderPass(this RenderGraph renderGraph, string name) => AddGenericRenderPass(renderGraph, name, 0);
         public static IndirectComputeRenderPass<int> AddIndirectComputeRenderPass(this RenderGraph renderGraph, string name) => AddIndirectComputeRenderPass(renderGraph, name, 0);
         public static ObjectRenderPass<int> AddObjectRenderPass(this RenderGraph renderGraph, string name) => AddObjectRenderPass(renderGraph, name, 0);
+        public static ObjectScreenRenderPass<int> AddObjectScreenRenderPass(this RenderGraph renderGraph, string name) => AddObjectScreenRenderPass(renderGraph, name, 0);
         public static RaytracingRenderPass<int> AddRaytracingRenderPass(this RenderGraph renderGraph, string name) => AddRaytracingRenderPass(renderGraph, name, 0);
         public static ShadowRenderPass<int> AddShadowRenderPass(this RenderGraph renderGraph, string name) => AddShadowRenderPass(renderGraph, name, 0);
 
