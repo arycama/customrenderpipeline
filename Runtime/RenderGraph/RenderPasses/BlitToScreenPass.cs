@@ -9,7 +9,6 @@ namespace CustomRenderPipeline
     {
         private Material material;
         private int passIndex;
-        private bool flip;
 
         public override bool OutputsToCameraTarget => true;
 
@@ -20,13 +19,12 @@ namespace CustomRenderPipeline
             return $"{Name} {material} {passIndex}";
         }
 
-        public void Initialize(Material material, Int2 viewSize, int viewCount = 1, int passIndex = 0, bool flip = false, int antiAliasing = 1, RenderTargetIdentifier frameBufferTarget = default, GraphicsFormat frameBufferFormat = default)
+        public void Initialize(Material material, Int2 viewSize, int viewCount = 1, int passIndex = 0, int antiAliasing = 1, RenderTargetIdentifier frameBufferTarget = default, GraphicsFormat frameBufferFormat = default)
         {
             this.material = material;
             Size = viewSize;
             ViewCount = viewCount;
             this.passIndex = passIndex;
-            this.flip = flip;
             AntiAliasing = antiAliasing;
             FrameBufferTarget = frameBufferTarget;
             FrameBufferFormat = frameBufferFormat;
@@ -108,14 +106,8 @@ namespace CustomRenderPipeline
             foreach (var keyword in keywords)
                 Command.EnableShaderKeyword(keyword);
 
-            if (flip)
-                Command.EnableShaderKeyword("FLIP");
-
             var primitiveCount = SystemInfo.supportsMultiview ? 3 : 3 * ViewCount;
             Command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, primitiveCount, 1, PropertyBlock);
-
-            if (flip)
-                Command.DisableShaderKeyword("FLIP");
 
             foreach (var keyword in keywords)
                 Command.DisableShaderKeyword(keyword);

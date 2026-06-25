@@ -57,14 +57,7 @@ namespace CustomRenderPipeline
                     Command.SetSinglePassStereo(SinglePassStereoMode.Multiview);
                 }
             }
-
-            if (RenderGraph.IsCullingCcw)
-                Command.EnableShaderKeyword("FLIP");
-
             Command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, 3 * primitiveCount * instanceMultiplier, 1, PropertyBlock);
-
-            if (RenderGraph.IsCullingCcw)
-                Command.DisableShaderKeyword("FLIP");
 
             if (stereoMode == SinglePassStereoMode.Instancing)
             {

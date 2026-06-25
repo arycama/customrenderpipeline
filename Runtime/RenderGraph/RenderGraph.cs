@@ -63,8 +63,6 @@ namespace CustomRenderPipeline
         public int FrameIndex { get; private set; }
         public bool IsExecuting { get; private set; }
         public bool CullRtHandles { get; set; }
-        public bool IsCullingCcw { get; private set; }
-        public bool IsOutputFlipped { get; set; }
 
         public RenderGraph(CustomRenderPipelineBase renderPipeline)
         {
@@ -488,7 +486,6 @@ namespace CustomRenderPipeline
             RtHandleSystem.AllocateFrameResources(renderPasses.Count, FrameIndex);
 
             IsExecuting = true;
-            IsCullingCcw = false;
 
             var previousNativePassIndex = -1;
             var previousSubPassIndex = -1;
@@ -497,7 +494,6 @@ namespace CustomRenderPipeline
                 var renderPass = renderPasses[i];
                 var currentNativePassIndex = renderPassIndices[i];
                 var currentSubPassIndex = subPassIndices[i];
-                var isCullingCcw = false;
 
                 // Begin a new pass if the index has increased
                 if (currentNativePassIndex != -1)
@@ -512,7 +508,6 @@ namespace CustomRenderPipeline
                             if (colorAttachment.frameBufferTarget.HasValue)
                             {
                                 format = colorAttachment.frameBufferFormat;
-                                isCullingCcw = IsOutputFlipped;
                             }
                             else
                             {
@@ -575,8 +570,6 @@ namespace CustomRenderPipeline
 
                         Span<byte> debugNameUtf8 = stackalloc byte[Encoding.UTF8.GetByteCount(descriptor.debugName)];
                         _ = Encoding.UTF8.GetBytes(descriptor.debugName, debugNameUtf8);
-
-                        IsCullingCcw = isCullingCcw;
 
                         var size = descriptor.isScreenPass ? RtHandleSystem.ScreenSize : descriptor.size;
                         command.BeginRenderPass(size.x, size.y, descriptor.viewCount, descriptor.antiAliasing, passAttachments.AsArray(), descriptor.depthAttachmentIndex, descriptor.shadingRateImageAttachmentIndex, descriptor.subpasses, debugNameUtf8);

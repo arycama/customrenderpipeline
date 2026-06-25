@@ -15,9 +15,8 @@ namespace CustomRenderPipeline
 
         private readonly List<RendererList> rendererLists = new();
         private SinglePassStereoMode stereoMode;
-        private bool flip;
 
-        public void Initialize(string tag, ScriptableRenderContext context, in CullingResults cullingResults, RenderQueueRange renderQueueRange, Int2 size, Float3 viewPosition, Quaternion viewRotation, Float3 sortAxis, DistanceMetric distanceMetric, SortingCriteria sortingCriteria = SortingCriteria.None, PerObjectData perObjectData = PerObjectData.None, bool excludeMotionVectors = false, int viewCount = 1, int antiAliasing = 1, RenderTargetIdentifier frameBufferTarget = default, GraphicsFormat frameBufferFormat = default, SinglePassStereoMode stereoMode = SinglePassStereoMode.None, bool flip = false)
+        public void Initialize(string tag, ScriptableRenderContext context, in CullingResults cullingResults, RenderQueueRange renderQueueRange, Int2 size, Float3 viewPosition, Quaternion viewRotation, Float3 sortAxis, DistanceMetric distanceMetric, SortingCriteria sortingCriteria = SortingCriteria.None, PerObjectData perObjectData = PerObjectData.None, bool excludeMotionVectors = false, int viewCount = 1, int antiAliasing = 1, RenderTargetIdentifier frameBufferTarget = default, GraphicsFormat frameBufferFormat = default, SinglePassStereoMode stereoMode = SinglePassStereoMode.None)
         {
             AntiAliasing = antiAliasing;
             this.stereoMode = stereoMode;
@@ -53,7 +52,6 @@ namespace CustomRenderPipeline
 
             FrameBufferTarget = frameBufferTarget;
             FrameBufferFormat = frameBufferFormat;
-            this.flip = flip;
         }
 
         public override void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
@@ -108,13 +106,7 @@ namespace CustomRenderPipeline
                 Command.SetSinglePassStereo(SinglePassStereoMode.Multiview);
             }
 
-            if (flip)
-                Command.EnableShaderKeyword("FLIP");
-
             Command.DrawRendererList(rendererLists[0]);
-
-            if (flip)
-                Command.DisableShaderKeyword("FLIP");
 
             if (stereoMode == SinglePassStereoMode.Instancing)
             {

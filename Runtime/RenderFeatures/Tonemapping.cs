@@ -42,7 +42,7 @@ namespace CustomRenderPipeline
                 halfViewSize,
                 renderGraph.RtHandleSystem));
 
-            pass.Initialize(tonemapMaterial, viewPassData.viewSize, viewPassData.viewCount, 0, false, 1, viewPassData.target, viewPassData.format);
+            pass.Initialize(tonemapMaterial, viewPassData.viewSize, viewPassData.viewCount, 0, 1, viewPassData.target, viewPassData.format);
             pass.PreventNewSubPass = true;
 
             pass.ReadRtHandle<CameraTarget>();
