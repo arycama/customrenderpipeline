@@ -293,6 +293,12 @@ namespace CustomRenderPipeline
 
             foreach (var displayRenderPass in viewPassDatas)
             {
+
+#if UNITY_EDITOR
+                if (displayRenderPass.camera.cameraType == CameraType.SceneView)
+                    context.SetupCameraProperties(displayRenderPass.camera, false);
+#endif
+
                 var profileMarker = renderCameraProfileMarkers[displayRenderPass.viewId];
                 ReadOnlySpan<ViewParameter> displayViewParameters = viewParameters.AsSpan(displayRenderPass.parameterStart, displayRenderPass.viewCount);
 
