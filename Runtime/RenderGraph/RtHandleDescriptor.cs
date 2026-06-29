@@ -24,8 +24,9 @@ public struct RtHandleDescriptor : IResourceDescriptor<RenderTexture>
 	public uint clearStencil;
 	public VRTextureUsage vrUsage;
 	public int antiAliasing;
+    public bool isCcw;
 
-	public RtHandleDescriptor(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool enableRandomWrite = false, bool isExactSize = false, bool clear = false, Color clearColor = default, float clearDepth = 1f, uint clearStencil = 0u, VRTextureUsage vrUsage = VRTextureUsage.None, int antiAliasing = 1)
+	public RtHandleDescriptor(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool enableRandomWrite = false, bool isExactSize = false, bool clear = false, Color clearColor = default, float clearDepth = 1f, uint clearStencil = 0u, VRTextureUsage vrUsage = VRTextureUsage.None, int antiAliasing = 1, bool isCcw = false)
 	{
 		this.width = width;
 		this.height = height;
@@ -43,6 +44,7 @@ public struct RtHandleDescriptor : IResourceDescriptor<RenderTexture>
 		this.clearStencil = clearStencil;
 		this.vrUsage = vrUsage;
 		this.antiAliasing = antiAliasing;
+        this.isCcw = isCcw;
 	}
 
 	public readonly override string ToString() => $"{width}x{height}x{volumeDepth} {format} {dimension}";
@@ -71,22 +73,41 @@ public struct RtHandleDescriptor : IResourceDescriptor<RenderTexture>
 		var depthFormat = isDepth ? format : GraphicsFormat.None;
 		var stencilFormat = isStencil ? GraphicsFormat.R8_UInt : GraphicsFormat.None;
 
-        var descriptor = new RenderTextureDescriptor
+        RenderTextureDescriptor descriptor;
+
+        if (isCcw)
         {
-            width = width,
-            height = height,
-            volumeDepth = volumeDepth,
-            msaaSamples = antiAliasing,
-            graphicsFormat = graphicsFormat,
-            depthStencilFormat = depthFormat,
-            mipCount = Texture.GenerateAllMips,
-            dimension = dimension,
-            shadowSamplingMode = ShadowSamplingMode.None,
-            vrUsage = vrUsage,
-            enableRandomWrite = enableRandomWrite,
-            stencilFormat = stencilFormat,
-            useMipMap = hasMips,
-        };
+            descriptor = new RenderTextureDescriptor(width, height, graphicsFormat, depthFormat, Texture.GenerateAllMips)
+            {
+                volumeDepth = volumeDepth,
+                msaaSamples = antiAliasing,
+                dimension = dimension,
+                shadowSamplingMode = ShadowSamplingMode.None,
+                vrUsage = vrUsage,
+                enableRandomWrite = enableRandomWrite,
+                stencilFormat = stencilFormat,
+                useMipMap = hasMips
+            };
+        }
+        else
+        {
+            descriptor = new RenderTextureDescriptor
+            {
+                width = width,
+                height = height,
+                volumeDepth = volumeDepth,
+                msaaSamples = antiAliasing,
+                graphicsFormat = graphicsFormat,
+                depthStencilFormat = depthFormat,
+                mipCount = Texture.GenerateAllMips,
+                dimension = dimension,
+                shadowSamplingMode = ShadowSamplingMode.None,
+                vrUsage = vrUsage,
+                enableRandomWrite = enableRandomWrite,
+                stencilFormat = stencilFormat,
+                useMipMap = hasMips,
+            };
+        }
 
         var result = new RenderTexture(descriptor)
         {

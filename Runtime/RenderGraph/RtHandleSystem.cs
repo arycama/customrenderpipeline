@@ -28,43 +28,47 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RtHandleDescri
 
 	protected override void DestroyResource(RenderTexture resource) => Object.DestroyImmediate(resource);
 
-	protected override RtHandleDescriptor CreateDescriptorFromResource(RenderTexture resource) => new(resource.width, resource.height, resource.graphicsFormat, resource.volumeDepth, resource.dimension, false, resource.useMipMap, resource.autoGenerateMips, resource.enableRandomWrite, true, vrUsage: resource.vrUsage, antiAliasing: resource.antiAliasing);
+	protected override RtHandleDescriptor CreateDescriptorFromResource(RenderTexture resource) => new(resource.width, resource.height, resource.graphicsFormat, resource.volumeDepth, resource.dimension, false, resource.useMipMap, resource.autoGenerateMips, resource.enableRandomWrite, true, vrUsage: resource.vrUsage, antiAliasing: resource.antiAliasing, isCcw: resource.descriptor.flags.HasFlag(RenderTextureCreationFlags.AllowVerticalFlip));
 
 	protected override bool DoesResourceMatchDescriptor(RenderTexture resource, RtHandleDescriptor descriptor)
 	{
+        var resourceDescriptor = resource.descriptor;
 		var isDepth = GraphicsFormatUtility.IsDepthFormat(descriptor.format);
-		if (isDepth && descriptor.format != resource.depthStencilFormat || !isDepth && descriptor.format != resource.graphicsFormat)
+		if (isDepth && descriptor.format != resourceDescriptor.depthStencilFormat || !isDepth && descriptor.format != resourceDescriptor.graphicsFormat)
 			return false;
 
-		if (resource.dimension != descriptor.dimension)
+		if (resourceDescriptor.dimension != descriptor.dimension)
 			return false;
 
-		if (resource.enableRandomWrite != descriptor.enableRandomWrite)
+		if (resourceDescriptor.enableRandomWrite != descriptor.enableRandomWrite)
 			return false;
 
-		if (resource.useMipMap != descriptor.hasMips)
+		if (resourceDescriptor.useMipMap != descriptor.hasMips)
 			return false;
 
-		if (resource.volumeDepth < descriptor.volumeDepth)
+		if (resourceDescriptor.volumeDepth < descriptor.volumeDepth)
 			return false;
 
-        if (resource.antiAliasing != descriptor.antiAliasing)
+        if (resourceDescriptor.msaaSamples != descriptor.antiAliasing)
             return false;
 
 		if (descriptor.isScreenTexture)
 		{
 			// For screen textures, ensure we get a rendertexture that is the actual screen width/height
-			if (resource.width != ScreenWidth || resource.height != ScreenHeight)
+			if (resourceDescriptor.width != ScreenWidth || resourceDescriptor.height != ScreenHeight)
 				return false;
 		}
 		else if (descriptor.isExactSize || descriptor.dimension == TextureDimension.Cube || descriptor.dimension == TextureDimension.CubeArray)
 		{
 			// Some textures need exact size. (Eg writing to multiple targets at non-screen resolution
-			if (resource.width != descriptor.width || resource.height != descriptor.height || resource.volumeDepth != descriptor.volumeDepth)
+			if (resourceDescriptor.width != descriptor.width || resourceDescriptor.height != descriptor.height || resourceDescriptor.volumeDepth != descriptor.volumeDepth)
 				return false;
 		}
-		else if (resource.width < descriptor.width || resource.height < descriptor.height)
+		else if (resourceDescriptor.width < descriptor.width || resourceDescriptor.height < descriptor.height)
 			return false;
+
+        if (descriptor.isCcw && !resourceDescriptor.flags.HasFlag(RenderTextureCreationFlags.AllowVerticalFlip))
+            return false;
 
 		return true;
 	}

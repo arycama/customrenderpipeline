@@ -293,10 +293,9 @@ namespace CustomRenderPipeline
 
             foreach (var displayRenderPass in viewPassDatas)
             {
-
 #if UNITY_EDITOR
-                if (displayRenderPass.camera.cameraType == CameraType.SceneView)
-                    context.SetupCameraProperties(displayRenderPass.camera, false);
+                // Required for gizmos, wireframe and a few other things
+                context.SetupCameraProperties(displayRenderPass.camera);
 #endif
 
                 var profileMarker = renderCameraProfileMarkers[displayRenderPass.viewId];
