@@ -25,7 +25,7 @@ namespace CustomRenderPipeline
                 Command.SetComputeTextureParam(computeShader, kernelIndex, colorBindings[i].Item2, GetRenderTexture(colorBindings[i].Item1), colorBindings[i].Item3);
 
             foreach (var keyword in keywords)
-                Command.EnableKeyword(computeShader, new LocalKeyword(computeShader, keyword));
+                Command.EnableShaderKeyword(keyword);
 
             if (normalizedDispatch)
                 Command.DispatchNormalized(computeShader, kernelIndex, xThreads, yThreads, zThreads);
@@ -39,7 +39,7 @@ namespace CustomRenderPipeline
             }
 
             foreach (var keyword in keywords)
-                Command.DisableKeyword(computeShader, new LocalKeyword(computeShader, keyword));
+                Command.DisableShaderKeyword(keyword);
         }
     }
 }

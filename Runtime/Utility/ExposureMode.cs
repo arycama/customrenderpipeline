@@ -1,5 +1,9 @@
-public enum ExposureMode
+namespace CustomRenderPipeline
 {
-	Automatic,
-	Manual
+    public enum ExposureMode
+    {
+        Manual,
+        CameraProperties,
+        Automatic
+    }
 }

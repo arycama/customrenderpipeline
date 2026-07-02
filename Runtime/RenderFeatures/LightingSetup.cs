@@ -226,21 +226,24 @@ namespace CustomRenderPipeline
                         throw new ArgumentOutOfRangeException(nameof(light.type));
                 }
 
-                var pointLightData = new LightData(
-                    lightToWorld.Translation - viewPassData.position,
-                    light.range,
-                    ColorspaceUtility.Rec709ToRec2020(visibleLight.finalColor.Float3()),
-                    (uint)light.type,
-                    lightToWorld.Right,
-                    angleScale,
-                    lightToWorld.Up,
-                    angleOffset,
-                    lightToWorld.Forward,
-                    shadowIndex,
-                    size,
-                    1.0f + light.range / (light.shadowNearPlane - light.range),
-                    light.shadowNearPlane * light.range / (light.range - light.shadowNearPlane));
-                lightList.Add(pointLightData);
+                if (visibleLight.lightType != LightType.Directional)
+                {
+                    var pointLightData = new LightData(
+                        lightToWorld.Translation - viewPassData.position,
+                        light.range,
+                        ColorspaceUtility.Rec709ToRec2020(visibleLight.finalColor.Float3()),
+                        (uint)light.type,
+                        lightToWorld.Right,
+                        angleScale,
+                        lightToWorld.Up,
+                        angleOffset,
+                        lightToWorld.Forward,
+                        shadowIndex,
+                        size,
+                        1.0f + light.range / (light.shadowNearPlane - light.range),
+                        light.shadowNearPlane * light.range / (light.range - light.shadowNearPlane));
+                    lightList.Add(pointLightData);
+                }
 
                 var lightShadowCasterCullingInfo = new LightShadowCasterCullingInfo()
                 {
