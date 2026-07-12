@@ -52,11 +52,11 @@ float3 FragmentDownsample(VertexFullscreenTriangleMinimalOutput input) : SV_Targ
 		groups[2] = (d + e + g + h) * (0.125f / 4.0f);
 		groups[3] = (e + f + h + i) * (0.125f / 4.0f);
 		groups[4] = (j + k + l + m) * (0.5f / 4.0f);
-		groups[0] *= KarisAverage(groups[0]);
-		groups[1] *= KarisAverage(groups[1]);
-		groups[2] *= KarisAverage(groups[2]);
-		groups[3] *= KarisAverage(groups[3]);
-		groups[4] *= KarisAverage(groups[4]);
+		//groups[0] *= KarisAverage(groups[0]);
+		//groups[1] *= KarisAverage(groups[1]);
+		//groups[2] *= KarisAverage(groups[2]);
+		//groups[3] *= KarisAverage(groups[3]);
+		//groups[4] *= KarisAverage(groups[4]);
 		color = groups[0] + groups[1] + groups[2] + groups[3] + groups[4];
 	#else
 		color = e * 0.125;

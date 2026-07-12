@@ -200,10 +200,10 @@ namespace CustomRenderPipeline
                     case LightType.Spot:
                         var halfAngle = Radians(light.spotAngle) * 0.5f;
                         var innerConePercent = light.innerSpotAngle / visibleLight.spotAngle;
-                        var cosSpotOuterHalfAngle = Saturate(Cos(halfAngle));
-                        var cosSpotInnerHalfAngle = Saturate(Cos(halfAngle * innerConePercent));
-                        angleScale = Rcp(Max(1e-4f, cosSpotInnerHalfAngle - cosSpotOuterHalfAngle));
-                        angleOffset = -cosSpotOuterHalfAngle * angleScale;
+                        var cosOuterHalfAngle = Saturate(Cos(halfAngle));
+                        var cosInnerHalfAngle = Saturate(Cos(halfAngle * innerConePercent));
+                        angleScale = Rcp(cosOuterHalfAngle - cosInnerHalfAngle);
+                        angleOffset = cosOuterHalfAngle * angleScale;
                         size.x = size.y = Rcp(Tan(halfAngle));
                         projectionType = BatchCullingProjectionType.Perspective;
                         break;
@@ -226,18 +226,20 @@ namespace CustomRenderPipeline
                         throw new ArgumentOutOfRangeException(nameof(light.type));
                 }
 
+                var test = Degrees(Acos(angleOffset / angleScale));
+
                 if (visibleLight.lightType != LightType.Directional)
                 {
                     var pointLightData = new LightData(
                         lightToWorld.Translation - viewPassData.position,
-                        light.range,
-                        ColorspaceUtility.Rec709ToRec2020(visibleLight.finalColor.Float3()),
-                        (uint)light.type,
-                        lightToWorld.Right,
-                        angleScale,
-                        lightToWorld.Up,
-                        angleOffset,
+                        Rcp(Sq(light.range)),
                         lightToWorld.Forward,
+                        angleScale,
+                        ColorspaceUtility.Rec709ToRec2020(visibleLight.finalColor.Float3()),
+                        angleOffset,
+                        lightToWorld.Right,
+                        (uint)light.type,
+                        lightToWorld.Up,
                         shadowIndex,
                         size,
                         1.0f + light.range / (light.shadowNearPlane - light.range),

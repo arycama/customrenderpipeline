@@ -15,14 +15,14 @@ struct DirectionalLight
 struct LightData
 {
 	float3 position;
-	float range;
-	float3 color;
-	uint lightType;
-	float3 right;
-	float angleScale;
-	float3 up;
-	float angleOffset;
+	float rangeSquaredRcp;
 	float3 forward;
+	float angleScale;
+	float3 color;
+	float angleOffset;
+	float3 right;
+	uint lightType;
+	float3 up;
 	uint shadowIndex;
 	float2 size;
 	float shadowProjectionX;
@@ -33,7 +33,7 @@ uint PointLightCount, TileSize;
 StructuredBuffer<LightData> PointLights;
 float ClusterBias, ClusterScale;
 Texture3D<uint2> LightClusterIndices;
-Buffer<uint> LightClusterList;
+StructuredBuffer<uint> LightClusterList;
 Texture2DArray<float> PointShadows, SpotShadows;
 
 const static uint LightTypeSpot = 0;

@@ -87,18 +87,8 @@ FragmentInput Vertex(uint vertexId : SV_VertexID)
 		uint index = LightClusterList[startOffset + i];
 		LightData light = PointLights[index];
 		
-		float3 lightVector = light.position - worldPosition;
-		float sqrLightDist = dot(lightVector, lightVector);
-		if (sqrLightDist >= Sq(light.range))
-			continue;
-		
-		float rcpLightDist = rsqrt(sqrLightDist);
-		float3 L = lightVector * rcpLightDist;
-		//float NdotL = dot(input.normal, L);
-		//if (!isVolumetric && NdotL <= 0.0)
-		//	continue;
-		
-		float attenuation = GetLightAttenuation(light, worldPosition, 0.5, false);
+		float3 L;
+		float attenuation = GetLightAttenuationAndShadow(light, worldPosition, 0.5, false, L);
 		if (!attenuation)
 			continue;
 		

@@ -133,110 +133,69 @@ float3 EvaluateLight(LightingInput input, float diffuseTerm, float f0Avg, float3
 	return RcpPi * result;
 }
 
-float GetLightAttenuation(LightData light, float3 worldPosition, float dither, bool softShadows)
+float GetLightAttenuationAndShadow(LightData light, float3 position, float dither, bool softShadows, out float3 L, bool getShadows = true)
 {
-	float3 lightVector = light.position - worldPosition;
-	float sqrLightDist = dot(lightVector, lightVector);
-	if (sqrLightDist >= Sq(light.range))
-		return 0.0;
+	float3 lightVector = light.position - position;
+	float distanceSquared = dot(lightVector, lightVector);
 		
-	float rcpLightDist = rsqrt(sqrLightDist);
-	float3 L = lightVector * rcpLightDist;
-	float rangeAttenuationScale = rcp(Sq(light.range));
-
-    // Rotate the light direction into the light space.
-	float3x3 lightToWorld = float3x3(light.right, light.up, light.forward);
-	float3 positionLS = mul(lightToWorld, -lightVector);
-
-    // Apply the sphere light hack to soften the core of the punctual light.
-    // It is not physically plausible (using max() is more correct, but looks worse).
-    // See https://www.desmos.com/calculator/otqhxunqhl
-	//float dist = max(light.size.x, length(lightVector));
-	float dist = length(lightVector);
-	float distSq = dist * dist;
-	float distRcp = rsqrt(distSq);
-    
-	float3 invHalfDim = rcp(float3(light.range + light.size.x * 0.5, light.range + light.size.y * 0.5, light.range));
-
-    // Tube Light
-	float attenuation = 1.0;
-	if (light.lightType == LightTypeTube)
+	// Range attenuation (Similar to frostbite, but n=2 instead of 4)
+	float attenuation = saturate(1.0h - distanceSquared * light.rangeSquaredRcp);
+		
+	// Angle attenuation
+	float rcpDistance = rsqrt(distanceSquared);
+	L = lightVector * rcpDistance;
+	attenuation *= saturate(dot(light.forward, L) * light.angleScale + light.angleOffset);
+	
+	// Distance squared falloff
+	attenuation *= min(rcpDistance, rcp(0.01h));
+	attenuation = Sq(attenuation);
+	
+    // Shadows
+	if (!getShadows || !attenuation || light.shadowIndex == UintMax)
+		return attenuation;
+	
+	// TODO: Use a shared atlas and unify where possible
+	if (light.angleScale)
 	{
-		attenuation *= EllipsoidalDistanceAttenuation(lightVector, invHalfDim, rangeAttenuationScale, 1.0);
-	}
-
-    // Rectangle light
-	if (light.lightType == LightTypeRectangle)
-	{
-		if (dot(light.forward, lightVector) >= FloatEps)
-			attenuation = 0.0;
-        
-		attenuation *= BoxDistanceAttenuation(positionLS, invHalfDim, 1, 1);
+		// Spot light
+		 // Rotate the light direction into the light space.
+		float3x3 lightToWorld = float3x3(light.right, light.up, light.forward);
+		float3 positionLS = mul(lightToWorld, -lightVector);
+		
+		float2 uv = positionLS.xy * light.size / positionLS.z * 0.5 + 0.5;
+		float depth = (positionLS.z * light.shadowProjectionX + light.shadowProjectionY) / positionLS.z;
+		uv.y = 1.0 - uv.y; // TODO: Why is this required?
+		attenuation *= SpotShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(uv, light.shadowIndex), depth);
 	}
 	else
 	{
-        // Inverse square + radial distance falloff
-        // {d, d^2, 1/d, d_proj}
-		float4 distances = float4(dist, distSq, distRcp, dot(-lightVector, light.forward));
-		attenuation *= PunctualLightAttenuation(distances, rangeAttenuationScale, 1.0, light.angleScale, light.angleOffset);
-
-        // Manually clip box light X/Y (Z is handled by above)
-		if (light.lightType == LightTypePyramid || light.lightType == LightTypeBox)
-		{
-            // Perform perspective projection for frustum light
-			float2 positionCS = positionLS.xy;
-			if (light.lightType == LightTypePyramid)
-				positionCS /= positionLS.z;
-
-			 // Box lights have no range attenuation, so we must clip manually.
-			if (Max3(float3(abs(positionCS), abs(positionLS.z - 0.5 * light.range) - 0.5 * light.range + 1)) > 0.5)
-				attenuation = 0.0;
-		}
-	}
-    
-    // Shadows (If enabled, disabled in reflection probes for now)
-	if (light.shadowIndex != UintMax)
-	{
-        // Point light
-		if (light.lightType == LightTypePoint)
-		{
-			float dominantAxis = Max3(abs(lightVector));
-			float depth = (dominantAxis * light.shadowProjectionX + light.shadowProjectionY) / dominantAxis;
+		// Point light
+		float dominantAxis = Max3(abs(lightVector));
+		float depth = (dominantAxis * light.shadowProjectionX + light.shadowProjectionY) / dominantAxis;
 			
-			float faceIndex = CubeMapFaceID(-lightVector);
-			float2 uv = CubeMapFaceUv(-lightVector, faceIndex);
-			float shadowIndex = light.shadowIndex + faceIndex;
-			attenuation *= PointShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(uv, shadowIndex), depth);
-		}
-
-        // Spot light
-		if (light.lightType == LightTypeSpot || light.lightType == LightTypePyramid || light.lightType == LightTypeBox)
-		{
-			float2 uv = positionLS.xy * light.size / positionLS.z * 0.5 + 0.5;
-			float depth = (positionLS.z * light.shadowProjectionX + light.shadowProjectionY) / positionLS.z;
-			uv.y = 1.0 - uv.y; // TODO: Why is this required?
-			attenuation *= SpotShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(uv, light.shadowIndex), depth);
-		}
-        
-        // Area light
-		//if (light.lightType == LightTypeRectangle)
-		//{
-		//	float4 positionLS = MultiplyPoint(_AreaShadowMatrices[light.shadowIndex], worldPosition);
-            
-  //          // Vogel disk randomised PCF
-		//	float sum = 0.0;
-		//	for (uint j = 0; j < _PcfSamples; j++)
-		//	{
-		//		float2 offset = VogelDiskSample(j, _PcfSamples, dither * TwoPi) * _ShadowPcfRadius;
-		//		float3 uv = float3(positionLS.xy + offset, positionLS.z) / positionLS.w;
-		//		sum += _AreaShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float3(uv.xy, light.shadowIndex), uv.z);
-		//	}
-                
-		//	attenuation *= sum / _PcfSamples;
-		//}
+		float faceIndex = CubeMapFaceID(-lightVector);
+		float2 uv = CubeMapFaceUv(-lightVector, faceIndex);
+		float shadowIndex = light.shadowIndex + faceIndex;
+		attenuation *= PointShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(uv, shadowIndex), depth);
 	}
 
 	return attenuation;
+}
+
+float GetLightAttenuationAndShadow(LightData light, float3 position, float dither, bool softShadows, bool getShadows = true)
+{
+	float3 L;
+	return GetLightAttenuationAndShadow(light, position, dither, softShadows, L, getShadows);
+}
+
+float GetLightAttenuation(LightData light, float3 position)
+{
+	return GetLightAttenuationAndShadow(light, position, 0.5, false, false);
+}
+
+float GetLightShadow(LightData light, float3 position, float dither, bool softShadows)
+{
+	return GetLightAttenuationAndShadow(light, position, dither, softShadows, true);
 }
 
 float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater = false, bool softShadows = false)
@@ -289,28 +248,19 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 	uint startOffset = lightOffsetAndCount.x;
 	uint lightCount = lightOffsetAndCount.y;
 	
-	// Point lights
+	// Point lightsq
 	for (uint i = 0; i < min(128, lightCount); i++)
 	{
 		uint index = LightClusterList[startOffset + i];
 		LightData light = PointLights[index];
-		
-		float3 lightVector = light.position - input.worldPosition;
-		float sqrLightDist = dot(lightVector, lightVector);
-		if (sqrLightDist >= Sq(light.range))
-			continue;
-		
-		float rcpLightDist = rsqrt(sqrLightDist);
-		float3 L = lightVector * rcpLightDist;
-		float NdotL = dot(input.N, L);
-		if (NdotL <= 0.0)
-			continue;
-		
-		float attenuation = GetLightAttenuation(light, input.worldPosition, 0.5, false);
+
+		float3 L;
+		float attenuation = GetLightAttenuationAndShadow(light, input.worldPosition, 0.5, false, L);
 		if (!attenuation)
 			continue;
 		
-		luminance += EvaluateLight(input, diffuseTerm, f0Avg, L, multiScatterTerm) * (light.color * Exposure * attenuation);
+		float3 lightColor = EvaluateLight(input, diffuseTerm, f0Avg, L, multiScatterTerm);
+		luminance += Exposure * attenuation * light.color * lightColor;
 	}
 	
 	// Indirect Lighting

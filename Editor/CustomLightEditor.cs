@@ -3,20 +3,21 @@ using UnityEditor;
 using UnityEditor.IMGUI.Controls;
 using UnityEngine;
 using UnityEngine.Rendering;
+using Unmath;
 using static Unmath.Math;
 
 namespace CustomRenderPipeline
 {
-
-    [CustomEditorForRenderPipeline(typeof(Light), typeof(CustomRenderPipelineAsset))]
+    [CustomEditor(typeof(Light)), SupportedOnRenderPipeline(typeof(CustomRenderPipelineAsset))]
     public class CustomLightEditor : LightEditor
     {
+        private float previousSolidAngle;
+
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
 
             var type = (LightType)settings.lightType.enumValueIndex;
-
             if (type == LightType.Directional)
             {
                 settings.DrawIntensity();
@@ -26,12 +27,17 @@ namespace CustomRenderPipeline
                 var unit = (LightUnit)EditorGUILayout.EnumPopup("Unit", (LightUnit)settings.lightUnit.intValue);
                 settings.lightUnit.intValue = (int)unit;
 
-                // Convert internal candela unit to other and display
+                // Convert to editor unit
+                var solidAngle = type == LightType.Point ? FourPi : Geometry.ConeAngleToSolidAngleDegrees(settings.spotAngle.floatValue);
                 var intensity = settings.intensity.floatValue;
+
+                if (previousSolidAngle == 0.0f || type == LightType.Point)
+                    previousSolidAngle = solidAngle;
+
                 switch (unit)
                 {
                     case LightUnit.Lumen:
-                        intensity *= FourPi;
+                        intensity = PhysicalLightUtility.LuminousIntensityToPower(intensity, previousSolidAngle);
                         break;
                     case LightUnit.Candela:
                         break;
@@ -42,54 +48,59 @@ namespace CustomRenderPipeline
                         // Equivalent to candela
                         break;
                     case LightUnit.Ev100:
+                        intensity = PhysicalLightUtility.CandelaToEv100(intensity);
                         break;
                     default:
                         throw new NotSupportedException(unit.ToString());
                 }
 
+                EditorGUI.BeginChangeCheck();
                 intensity = EditorGUILayout.FloatField("Intensity", intensity);
-
-                // Convert back
-                switch (unit)
+                if (EditorGUI.EndChangeCheck() || solidAngle != previousSolidAngle)
                 {
-                    case LightUnit.Lumen:
-                        intensity /= FourPi;
-                        break;
-                    case LightUnit.Candela:
-                        break;
-                    case LightUnit.Lux:
-                        // Assume lux at 1m
-                        break;
-                    case LightUnit.Nits:
-                        // Equivalent to candela
-                        break;
-                    case LightUnit.Ev100:
-                        break;
-                    default:
-                        throw new NotSupportedException(unit.ToString());
+                    // Convert back to luminous intensity for storage+shader use
+                    switch (unit)
+                    {
+                        case LightUnit.Lumen:
+                            intensity = PhysicalLightUtility.LuminousPowerToIntensity(intensity, solidAngle);
+                            break;
+                        case LightUnit.Candela:
+                            break;
+                        case LightUnit.Lux:
+                            // Assume lux at 1m
+                            break;
+                        case LightUnit.Nits:
+                            // Equivalent to candela
+                            break;
+                        case LightUnit.Ev100:
+                            intensity = PhysicalLightUtility.Ev100ToCandela(intensity);
+                            break;
+                        default:
+                            throw new NotSupportedException(unit.ToString());
+                    }
+
+                    settings.intensity.floatValue = intensity;
                 }
 
-                settings.intensity.floatValue = intensity;
+                previousSolidAngle = solidAngle;
             }
 
             settings.DrawColor();
-            settings.DrawShadowsType();
+            settings.shadowsType.intValue = EditorGUILayout.Toggle("Shadows", settings.shadowsType.intValue != 0) ? 2 : 0;
 
             _ = EditorGUILayout.PropertyField(settings.lightType);
 
             if (type != LightType.Directional)
                 settings.DrawRange();
 
+            if (type == LightType.Spot)
+                settings.DrawInnerAndOuterSpotAngle();
+
             if (type != LightType.Directional && type != LightType.Point)
             {
                 _ = EditorGUILayout.PropertyField(settings.areaSizeX);
                 _ = EditorGUILayout.PropertyField(settings.areaSizeY);
             }
-
-            if (type == LightType.Spot)
-                settings.DrawInnerAndOuterSpotAngle();
-
-
 
             _ = serializedObject.ApplyModifiedProperties();
         }
@@ -452,9 +463,7 @@ namespace CustomRenderPipeline
                     DrawPointLightGizmo(light);
                     break;
                 case LightType.Spot:
-                    {
-                        DrawSpotLightGizmo(light);
-                    }
+                    DrawSpotLightGizmo(light);
                     break;
                 case LightType.Pyramid:
                     {

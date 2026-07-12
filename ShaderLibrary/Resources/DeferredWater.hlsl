@@ -33,6 +33,8 @@ float4 _FoamTex_ST;
 float _Smoothness;
 float _WaterMiePhase, _WaterMieFactor;
 
+SamplerState LinearMirrorSampler;
+
 struct FragmentOutput
 {
 	GBufferOutput gbuffer;
@@ -111,23 +113,23 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 	float3 underwaterWorldPosition = IntersectRayPlane(worldPosition, refr, float3(0, underwaterBackgroundPosition.y, 0), float3(0, 1, 0));
 	float2 refractedPositionSS = MultiplyPointProj(WorldToPixel, underwaterWorldPosition).xy;
 	
-	if (any(refractedPositionSS < 0 || refractedPositionSS > ViewSize - 1))
-	{
-		refractedPositionSS = input.position.xy;
-		underwaterWorldPosition = underwaterBackgroundPosition;
-	}
+	//if (any(refractedPositionSS < 0 || refractedPositionSS > ViewSize - 1))
+	//{
+	//	refractedPositionSS = input.position.xy;
+	//	underwaterWorldPosition = underwaterBackgroundPosition;
+	//}
 	
-	underwaterDepth = CameraDepthCopy[refractedPositionSS];
+	underwaterDepth = CameraDepthCopy[clamp(refractedPositionSS, 0, ViewSize - 1)];
 	underwaterWorldPosition = PixelToWorldPosition(float3(refractedPositionSS, underwaterDepth));
 
 	// If this offset is above water, revert to the non-refracted position to avoid above water objects bleeding into the refractions
 	// TODO: Combine with above check
-	if (underwaterDepth > depth)
-	{
-		//uvOffset = 0.0;
-		underwaterDepth = CameraDepthCopy[input.position.xy];
-		refractedPositionSS = input.position.xy;
-	}
+	//if (underwaterDepth > depth)
+	//{
+	//	//uvOffset = 0.0;
+	//	underwaterDepth = CameraDepthCopy[input.position.xy];
+	//	refractedPositionSS = input.position.xy;
+	//}
 	
 	float maxUnderwaterDistance = distance(worldPosition, underwaterWorldPosition);
 	float3 underwaterV = normalize(worldPosition - underwaterWorldPosition);
@@ -181,7 +183,7 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 	float3 underwater = 0.0;
 	if (underwaterDepth)
 	{
-		underwater = _UnderwaterResult.Sample(LinearClampSampler, ClampScaleTextureUv(refractedPositionSS * RcpViewSize, CurrentScaleLimit));
+		underwater = _UnderwaterResult.Sample(LinearMirrorSampler, refractedPositionSS * RcpViewSize);
 		underwater *= exp(-Extinction * maxUnderwaterDistance);
 	}
 

@@ -24,12 +24,38 @@ FragmentInput Vertex(uint id : SV_VertexID)
 	return output;
 }
 
-float AngularDiameter;
-float3 Direction, Illuminance;
+float3 Direction, Luminance;
+float MaxX, ApertureRadius;
 
 Texture2D<float4> CloudTexture;
 Texture2D<float3> SkyTexture, _Input;
 Texture2D<float> CloudTransmittanceTexture;
+
+float Gauss(float x)
+{
+	return exp(-0.5 * Sq(x));
+}
+
+float J1(float x)
+{
+	return (sqrt(1.0 + 0.12138 * Sq(x)) * (46.68634 + 5.82514 * Sq(x)) * sin(x) - x * (17.83632 + 2.02948 * Sq(x)) * cos(x)) / ((57.70003 + 17.49211 * Sq(x)) * pow(1 + 0.12138 * Sq(x), 3.0 / 4.0));
+}
+
+float AiryDisc(float x)
+{
+	return Sq(2.0 * J1(x) / x);
+}
+
+float AiryDiscApprox(float x)
+{
+	if (abs(x) < 1.88)
+		return Gauss(x / 1.4);
+	
+	if (abs(x) <= 6.0)
+		return (Gauss(x / 1.4) + 2.7 / abs(x * x * x)) / 2.0;
+		
+	return 1.35 / abs(x * x * x);
+}
 
 float3 Fragment(FragmentInput input) : SV_Target
 {
@@ -40,12 +66,6 @@ float3 Fragment(FragmentInput input) : SV_Target
 	if (RayIntersectsGround(ViewHeight, -V.y))
 		discard;
 		
-	 // 1. Considering the sun as a perfect disk, evaluate  it's solid angle (Could be precomputed)
-	float solidAngle = TwoPi * (1.0 - cos(0.5 * radians(AngularDiameter)));
-
-    // 2. Evaluate sun luiminance at ground level accoridng to solidAngle and illuminance at zenith (noon)
-	float3 luminance = Illuminance * Exposure / solidAngle;
-	
 	// Limb darkening
 	float centerToEdge = length(2.0 * input.uv - 1.0);
     
@@ -70,8 +90,44 @@ float3 Fragment(FragmentInput input) : SV_Target
 	float mu5 = mu4 * mu;
 
 	factor = a0 + a1 * mu + a2 * mu2 + a3 * mu3 + a4 * mu4 + a5 * mu5;
-	luminance *= max(0, factor);
+	float3 luminance = max(0, factor) * Luminance * Exposure;
 	luminance *= TransmittanceToAtmosphere(ViewHeight, -V.y);
 	
-	return luminance;
+	// Airy disk
+	float angularRadius = 0.5 * radians(0.53);
+	float sinTheta = sin(centerToEdge * SunAngularRadius);
+	float3 k = TwoPi / float3(6.30e-7, 5.23e-7, 4.67e-7);
+	float3 x = k * ApertureRadius * sinTheta;
+	
+	// Smooth airy disk approximation, does not fall off to 0, so window it with smoothstep
+	float3 result;
+	//if (abs(x) < 1.88)
+	//{
+	//	result = Gauss(x / 1.4);
+	//}
+	//else if (abs(x) <= 6.0)
+	//{
+	//	result = (Gauss(x / 1.4) + 2.7 / abs(x * x * x)) / 2.0;
+	//}
+	//else
+	//{
+	//	result = 1.35 / abs(x * x * x);
+	//}
+	
+	//result *= smoothstep(MaxX, 0, x);
+	
+	//float3 result;
+	//result.r = AiryDisc(x.r);
+	//result.g = AiryDisc(x.g);
+	//result.b = AiryDisc(x.b);
+	
+	result.r = AiryDisc(x.r);
+	result.g = AiryDisc(x.g);
+	result.b = AiryDisc(x.b);
+	
+	result.r = AiryDiscApprox(x.r);
+	result.g = AiryDiscApprox(x.g);
+	result.b = AiryDiscApprox(x.b);
+	
+	return result * luminance;
 }

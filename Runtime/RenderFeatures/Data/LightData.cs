@@ -1,29 +1,31 @@
-﻿using UnityEngine;
+﻿using Unmath;
 
 namespace CustomRenderPipeline
 {
     public readonly struct LightData
     {
-        private readonly Vector3 position;
-        private readonly float range;
-        private readonly Vector3 color;
-        private readonly uint lightType;
-        private readonly Vector3 right;
+        private readonly Float3 position;
+        private readonly float rangeSquaredRcp;
+        private readonly Float3 forward;
         private readonly float angleScale;
-        private readonly Vector3 up;
+        private readonly Float3 color;
         private readonly float angleOffset;
-        private readonly Vector3 forward;
+
+        // TODO: Can we simplify any of this
+        private readonly Float3 right;
+        private readonly uint lightType;
+        private readonly Float3 up;
         private readonly uint shadowIndex;
-        private readonly Vector2 size;
+        private readonly Float2 size;
         private readonly float depthRemapScale;
         private readonly float depthRemapOffset;
 
-        public LightData(Vector3 positionWS, float range, Vector3 color, uint lightType, Vector3 right, float angleScale, Vector3 up, float angleOffset, Vector3 forward, uint shadowIndex, Vector2 size, float depthRemapScale, float depthRemapOffset) : this()
+        public LightData(Float3 positionWS, float rangeSquaredRcp, Float3 forward, float angleScale, Float3 color, float angleOffset, Float3 right, uint lightType, Float3 up, uint shadowIndex, Float2 size, float depthRemapScale, float depthRemapOffset)
         {
             position = positionWS;
-            this.range = range;
+            this.rangeSquaredRcp = rangeSquaredRcp;
             this.color = color;
-            this.lightType = lightType; // (uint)LightingUtils.GetLightType(light);
+            this.lightType = lightType;
             this.right = right;
             this.angleScale = angleScale;
             this.up = up;

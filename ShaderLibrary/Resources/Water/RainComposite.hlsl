@@ -23,10 +23,10 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	
 	float3 geoNormal = normalize(cross(ddx_fine(worldPosition), ddy_fine(worldPosition)));
 	float wetLevel = saturate(Sq(dot(geoNormal, float3(0, 1, 0)))) * WetLevel;
-	float rippleLevel = 0 * saturate(Remap(dot(geoNormal, float3(0, 1, 0)), 0.75, 1.0));
+	float rippleLevel = saturate(Remap(dot(geoNormal, float3(0, 1, 0)), 0.75, 1.0));
 	rainNormal = lerp(float3(0, 1, 0), rainNormal, rippleLevel);
 	
-	float2 offset = rainNormal.xz * rippleLevel * 0.1 * WetLevel * 0.5 / (TanHalfFov * eyeDepth);
+	float2 offset = rainNormal.xz * rippleLevel *  WetLevel * 0.5 / (TanHalfFov * eyeDepth);
 	float2 screenUv = floor(clamp(position.xy + offset * ViewSize, 0.5, ViewSize - 0.5)) + 0.5;
 	
 	float waterDepth = 0.01 * wetLevel;

@@ -76,7 +76,7 @@ namespace CustomRenderPipeline
 
             using (var pass = renderGraph.AddComputeRenderPass("Clustered Light Culling", (tileSize: settings.TileSize, rcpClusterDepth: 1.0f / settings.ClusterDepth, counterBuffer)))
             {
-                pass.Initialize(computeShader, 0, clusterWidth, clusterHeight, settings.ClusterDepth, false);
+                pass.Initialize(computeShader, 0, clusterWidth, clusterHeight, settings.ClusterDepth);
                 pass.ReadResource<LightingSetup.Result>();
 
                 pass.WriteBuffer("LightClusterListWrite", lightList);

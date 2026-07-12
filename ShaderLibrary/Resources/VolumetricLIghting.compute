@@ -55,19 +55,17 @@ void Compute(uint3 id : SV_DispatchThreadID)
 	for (uint i = 0; i < min(128, lightOffsetAndCount.y); i++)
 	{
 		LightData light = PointLights[LightClusterList[lightOffsetAndCount.x + i]];
-		
-		float3 lightVector = light.position - worldPosition;
-		float sqrLightDist = dot(lightVector, lightVector);
-		if (sqrLightDist >= Sq(light.range))
+
+		float3 L;
+		float attenuation = GetLightAttenuationAndShadow(light, worldPosition, 0.5, false, L);
+		if (!attenuation)
 			continue;
 		
-		float rcpLightDist = rsqrt(sqrLightDist);
-		float3 L = lightVector * rcpLightDist;
-
-		float attenuation = GetLightAttenuation(light, worldPosition, 0.5, false);
 		float3 scatter = AtmosphereScatter(ViewHeight, worldDir.y, viewDistance, dot(L, worldDir));
-		lighting += attenuation * Exposure * scatter * light.color;
+		lighting += attenuation * scatter * light.color;
 	}
+	
+	lighting *= Exposure * IsotropicPhase();
 	
 	// TODO: Ensure extinction is premultiplied by log2e
 	float4 luminanceExtinction = float4(lighting, 0.0);
