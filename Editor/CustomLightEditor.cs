@@ -8,7 +8,7 @@ using static Unmath.Math;
 
 namespace CustomRenderPipeline
 {
-    [CustomEditor(typeof(Light)), SupportedOnRenderPipeline(typeof(CustomRenderPipelineAsset))]
+    [CustomEditor(typeof(Light)), SupportedOnRenderPipeline(typeof(CustomRenderPipelineAssetBase))]
     public class CustomLightEditor : LightEditor
     {
         private float previousSolidAngle;
@@ -16,7 +16,7 @@ namespace CustomRenderPipeline
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
-
+            var atten = settings.light.luxAtDistance;
             var type = (LightType)settings.lightType.enumValueIndex;
             if (type == LightType.Directional)
             {
@@ -30,6 +30,7 @@ namespace CustomRenderPipeline
                 // Convert to editor unit
                 var solidAngle = type == LightType.Point ? FourPi : Geometry.ConeAngleToSolidAngleDegrees(settings.spotAngle.floatValue);
                 var intensity = settings.intensity.floatValue;
+                var luxAtDistance = settings.luxAtDistance.floatValue;
 
                 if (previousSolidAngle == 0.0f || type == LightType.Point)
                     previousSolidAngle = solidAngle;
@@ -37,18 +38,18 @@ namespace CustomRenderPipeline
                 switch (unit)
                 {
                     case LightUnit.Lumen:
-                        intensity = PhysicalLightUtility.LuminousIntensityToPower(intensity, previousSolidAngle);
+                        intensity = PhysicalLightUtility.IntensityToPower(intensity, previousSolidAngle);
                         break;
                     case LightUnit.Candela:
                         break;
                     case LightUnit.Lux:
-                        // Assume lux at 1m
+                        intensity = PhysicalLightUtility.IntensityToFlux(intensity, luxAtDistance);
                         break;
                     case LightUnit.Nits:
                         // Equivalent to candela
                         break;
                     case LightUnit.Ev100:
-                        intensity = PhysicalLightUtility.CandelaToEv100(intensity);
+                        intensity = PhysicalLightUtility.IntensityToEv100(intensity);
                         break;
                     default:
                         throw new NotSupportedException(unit.ToString());
@@ -56,30 +57,35 @@ namespace CustomRenderPipeline
 
                 EditorGUI.BeginChangeCheck();
                 intensity = EditorGUILayout.FloatField("Intensity", intensity);
+
+                if (unit == LightUnit.Lux)
+                    luxAtDistance = EditorGUILayout.FloatField("Distance", luxAtDistance);
+
                 if (EditorGUI.EndChangeCheck() || solidAngle != previousSolidAngle)
                 {
                     // Convert back to luminous intensity for storage+shader use
                     switch (unit)
                     {
                         case LightUnit.Lumen:
-                            intensity = PhysicalLightUtility.LuminousPowerToIntensity(intensity, solidAngle);
+                            intensity = PhysicalLightUtility.PowerToIntensity(intensity, solidAngle);
                             break;
                         case LightUnit.Candela:
                             break;
                         case LightUnit.Lux:
-                            // Assume lux at 1m
+                            intensity = PhysicalLightUtility.FluxToIntensity(intensity, luxAtDistance);
                             break;
                         case LightUnit.Nits:
                             // Equivalent to candela
                             break;
                         case LightUnit.Ev100:
-                            intensity = PhysicalLightUtility.Ev100ToCandela(intensity);
+                            intensity = PhysicalLightUtility.Ev100ToIntensity(intensity);
                             break;
                         default:
                             throw new NotSupportedException(unit.ToString());
                     }
 
                     settings.intensity.floatValue = intensity;
+                    settings.luxAtDistance.floatValue = luxAtDistance;
                 }
 
                 previousSolidAngle = solidAngle;
@@ -91,12 +97,18 @@ namespace CustomRenderPipeline
             _ = EditorGUILayout.PropertyField(settings.lightType);
 
             if (type != LightType.Directional)
+            {
                 settings.DrawRange();
+                settings.enableSpotReflector.boolValue = EditorGUILayout.Toggle("Attenuate", settings.enableSpotReflector.boolValue);
+            }
 
             if (type == LightType.Spot)
                 settings.DrawInnerAndOuterSpotAngle();
 
-            if (type != LightType.Directional && type != LightType.Point)
+            if (type == LightType.Point || type == LightType.Spot || type == LightType.Tube)
+                settings.areaSizeX.floatValue = EditorGUILayout.FloatField("Size", settings.areaSizeX.floatValue);
+
+            if (type == LightType.Pyramid || type == LightType.Box || type == LightType.Rectangle)
             {
                 _ = EditorGUILayout.PropertyField(settings.areaSizeX);
                 _ = EditorGUILayout.PropertyField(settings.areaSizeY);
