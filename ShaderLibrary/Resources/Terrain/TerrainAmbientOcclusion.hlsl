@@ -1,3 +1,4 @@
+#include "../../Common.hlsl"
 #include "../../CommonShaders.hlsl"
 #include "../../Geometry.hlsl"
 #include "../../Packing.hlsl"

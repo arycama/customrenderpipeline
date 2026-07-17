@@ -1,6 +1,7 @@
 #define EMISSION_DISABLED
 
 #include "../../Common.hlsl"
+#include "../../CommonShaders.hlsl"
 #include "../../GBuffer.hlsl"
 #include "../../Geometry.hlsl"
 #include "../../SpaceTransforms.hlsl"

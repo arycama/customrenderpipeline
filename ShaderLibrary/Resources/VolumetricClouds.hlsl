@@ -1,3 +1,5 @@
+#include "../Common.hlsl"
+#include "../CommonShaders.hlsl"
 #include "../CloudCommon.hlsl"
 #include "../Color.hlsl"
 #include "../Temporal.hlsl"

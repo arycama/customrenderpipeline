@@ -1,4 +1,5 @@
 #include "../../Common.hlsl"
+#include "../../CommonShaders.hlsl"
 #include "../../GBuffer.hlsl"
 #include "../../SpaceTransforms.hlsl"
 

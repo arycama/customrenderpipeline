@@ -1,4 +1,5 @@
 #include "../../Common.hlsl"
+#include "../../CommonShaders.hlsl"
 #include "../../Material.hlsl"
 #include "../../Samplers.hlsl"
 #include "../../Temporal.hlsl"

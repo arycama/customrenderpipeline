@@ -1,4 +1,5 @@
 #include "../BloomCommon.hlsl"
+#include "../Common.hlsl"
 #include "../CommonShaders.hlsl"
 #include "../Color.hlsl"
 #include "../Material.hlsl"

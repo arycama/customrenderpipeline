@@ -1,6 +1,7 @@
 #include "../../Atmosphere.hlsl"
 #include "../../Color.hlsl"
 #include "../../Common.hlsl"
+#include "../../CommonShaders.hlsl"
 #include "../../Geometry.hlsl"
 #include "../../Lighting.hlsl"
 #include "../../CloudCommon.hlsl"

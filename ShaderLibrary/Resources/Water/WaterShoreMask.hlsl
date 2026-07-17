@@ -1,4 +1,5 @@
 #include "../../Common.hlsl"
+#include "../../CommonShaders.hlsl"
 #include "../../Math.hlsl"
 
 Texture2D<float> Heightmap;

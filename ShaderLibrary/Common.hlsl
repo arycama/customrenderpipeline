@@ -1,8 +1,6 @@
 ﻿#ifndef COMMON_INCLUDED
 #define COMMON_INCLUDED
 
-#include "CommonShaders.hlsl"
-
 Texture2D<float> CameraDepth, HiZMinDepth, HiZMaxDepth;
 Texture2D<float> PreviousCameraDepth;
 Texture2D<float2> CameraVelocity, PreviousCameraVelocity;
@@ -236,5 +234,13 @@ uint GetViewId()
 {
 	return 0;
 }
+
+#if defined(STEREO_MULTIVIEW_ON) && !defined(UNITY_COMPILER_DXC)
+	cbuffer OVR_multiview
+	{
+		uint gl_ViewID;
+		uint numViews_2;
+	};
+#endif
 
 #endif

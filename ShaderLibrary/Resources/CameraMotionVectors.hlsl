@@ -1,4 +1,5 @@
 #include "../Common.hlsl"
+#include "../CommonShaders.hlsl"
 #include "../Temporal.hlsl"
 
 float2 Fragment(VertexFullscreenTriangleMinimalOutput input) : SV_Target

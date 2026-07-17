@@ -1,4 +1,5 @@
 ﻿#include "../Common.hlsl"
+#include "../CommonShaders.hlsl"
 #include "../Lighting.hlsl"
 #include "../GBuffer.hlsl"
 #include "../Random.hlsl"

@@ -3,6 +3,15 @@
 
 uint GetViewId();
 
+struct VertexInput
+{
+	uint id : SV_VertexID;
+	
+	#if defined(STEREO_MULTIVIEW_ON) && defined(UNITY_COMPILER_DXC)
+		[[vk::ext_decorate(11, 4440)]] uint viewIndex : VIEWIDX;
+	#endif
+};
+
 struct VertexFullscreenTriangleMinimalOutput
 {
 	float4 position : SV_Position;
@@ -21,6 +30,14 @@ struct VertexFullscreenTriangleOutput
 	
 	#ifdef STEREO_INSTANCING_ON
 		uint viewIndex : SV_RenderTargetArrayIndex;
+	#else
+		#if defined(STEREO_MULTIVIEW_ON) && defined(UNITY_COMPILER_DXC)
+			#ifdef SHADER_STAGE_FRAGMENT
+				[[vk::ext_decorate(11, 4440)]] uint viewIndex : VIEWIDX;
+			#else
+				uint viewIndex : VIEWIDX;
+			#endif
+		#endif
 	#endif
 };
 
@@ -33,25 +50,35 @@ struct VertexFullscreenTriangleVolumeOutput
 
 float3 GetFrustumCorner(uint id);
 
-void VertexFullscreenTriangleInternal(uint id, out float4 position, out float2 uv, out uint viewIndex)
+void VertexFullscreenTriangleInternal(VertexInput input, out float4 position, out float2 uv, out uint viewIndex, out uint cornerId)
 {
-	uint localId = id % 3;
+	uint localId = input.id % 3;
 	uv = (localId << uint2(0, 1)) & 2;
 	position = float3(uv * 2.0 - 1.0, 1.0).xyzz;
 	uv.y = 1.0 - uv.y;
-	viewIndex = id / 3;
+	viewIndex = input.id / 3;
+	
+	cornerId = input.id;
+	
+	#ifdef STEREO_MULTIVIEW_ON
+		#ifdef UNITY_COMPILER_DXC
+			cornerId += 3u * input.viewIndex;
+		#else
+			cornerId += 3u * gl_ViewID;
+		#endif
+	#endif
 }
 
-uint VertexIdPassthrough(uint id : SV_VertexID) : TEXCOORD
+uint VertexIdPassthrough(VertexInput input) : TEXCOORD
 {
-	return id;
+	return input.id;
 }
 
-VertexFullscreenTriangleMinimalOutput VertexFullscreenTriangleMinimal(uint id : SV_VertexID)
+VertexFullscreenTriangleMinimalOutput VertexFullscreenTriangleMinimal(VertexInput input)
 {
-	uint viewIndex;
+	uint viewIndex, cornerId;
 	VertexFullscreenTriangleMinimalOutput output;
-	VertexFullscreenTriangleInternal(id, output.position, output.uv, viewIndex);
+	VertexFullscreenTriangleInternal(input, output.position, output.uv, viewIndex, cornerId);
 	
 	#ifdef STEREO_INSTANCING_ON
 		output.viewIndex = viewIndex;
@@ -60,24 +87,25 @@ VertexFullscreenTriangleMinimalOutput VertexFullscreenTriangleMinimal(uint id : 
 	return output;
 }
 
-VertexFullscreenTriangleOutput VertexFullscreenTriangle(uint id : SV_VertexID)
+VertexFullscreenTriangleOutput VertexFullscreenTriangle(VertexInput input)
 {
-	uint viewIndex;
+	uint viewIndex, cornerId;
 	VertexFullscreenTriangleOutput output;
-	VertexFullscreenTriangleInternal(id, output.position, output.uv, viewIndex);
+	VertexFullscreenTriangleInternal(input, output.position, output.uv, viewIndex, cornerId);
 	
 	#ifdef STEREO_INSTANCING_ON
 		output.viewIndex = viewIndex;
 	#endif
 	
-	output.worldDirection = GetFrustumCorner(id);
+	output.worldDirection = GetFrustumCorner(cornerId);
 	return output;
 }
 
-VertexFullscreenTriangleVolumeOutput VertexFullscreenTriangleVolume(uint id : SV_VertexID)
+VertexFullscreenTriangleVolumeOutput VertexFullscreenTriangleVolume(VertexInput input)
 {
+	uint cornerId;
 	VertexFullscreenTriangleVolumeOutput output;
-	VertexFullscreenTriangleInternal(id, output.position, output.uv, output.viewIndex);
+	VertexFullscreenTriangleInternal(input, output.position, output.uv, output.viewIndex, cornerId);
 	return output;
 }
 

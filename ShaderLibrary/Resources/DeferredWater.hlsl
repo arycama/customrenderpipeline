@@ -5,6 +5,7 @@
 
 #include "../Atmosphere.hlsl"
 #include "../Common.hlsl"
+#include "../CommonShaders.hlsl"
 #include "../Exposure.hlsl"
 #include "../GBuffer.hlsl"
 #include "../Lighting.hlsl"

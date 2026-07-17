@@ -1,4 +1,5 @@
 #include "../../Common.hlsl"
+#include "../../CommonShaders.hlsl"
 #include "../../Random.hlsl"
 #include "../../Samplers.hlsl"
 #include "../../TerrainCommon.hlsl"

@@ -1,3 +1,5 @@
+#include "../Common.hlsl"
+#include "../CommonShaders.hlsl"
 #include "../Lighting.hlsl"
 #include "../Geometry.hlsl"
 
