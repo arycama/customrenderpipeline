@@ -11,6 +11,8 @@ Shader "Hidden/Depth of Field"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
+            #pragma use_dxc
+			#pragma require waveMath
             #include "DepthOfField.hlsl"
             ENDHLSL
         }

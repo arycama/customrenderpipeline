@@ -22,7 +22,8 @@ Shader "Hidden/Deferred Lighting"
            Blend One One
 
             HLSLPROGRAM
-            #pragma target 5.0
+			#pragma use_dxc
+			#pragma require waveMath
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
             #pragma editor_sync_compilation
@@ -47,7 +48,8 @@ Shader "Hidden/Deferred Lighting"
            Blend One One
 
             HLSLPROGRAM
-            #pragma target 5.0
+			#pragma use_dxc
+			#pragma require waveMath
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
             #pragma editor_sync_compilation
@@ -75,6 +77,8 @@ Shader "Hidden/Deferred Lighting"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
+            #pragma use_dxc
+			#pragma require waveMath
             #pragma editor_sync_compilation
             #pragma target 5.0
             #define UNDERWATER_LIGHTING_ON

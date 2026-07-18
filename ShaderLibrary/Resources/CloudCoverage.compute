@@ -1,8 +1,11 @@
+#pragma kernel CloudCoverage
+
+#pragma use_dxc
+#pragma require waveMath
+
 #include "../Common.hlsl"
 #include "../Atmosphere.hlsl"
 #include "../CloudCommon.hlsl"
-
-#pragma kernel CloudCoverage
 
 RWStructuredBuffer<float4> _Result;
 

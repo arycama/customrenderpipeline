@@ -9,7 +9,8 @@ Shader "Hidden/PrecomputeDfg"
 
         HLSLINCLUDE
         #pragma editor_sync_compilation
-        #pragma target 5.0
+        #pragma use_dxc
+		#pragma require waveMath
         #include "PrecomputeDFG.hlsl"
         ENDHLSL
 

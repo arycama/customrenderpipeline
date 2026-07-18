@@ -73,29 +73,29 @@ FragmentInput Vertex(uint vertexId : SV_VertexID)
 	
 	float2 pixelPosition = (output.position.xy / output.position.w * 0.5 + 0.5) * ViewSize;
 	
-	uint3 clusterIndex;
-	clusterIndex.xy = pixelPosition / TileSize;
-	clusterIndex.z = log2(output.position.w) * ClusterScale + ClusterBias;
+	//uint3 clusterIndex;
+	//clusterIndex.xy = pixelPosition / TileSize;
+	//clusterIndex.z = log2(output.position.w) * ClusterScale + ClusterBias;
 	
-	uint2 lightOffsetAndCount = LightClusterIndices[clusterIndex];
-	uint startOffset = lightOffsetAndCount.x;
-	uint lightCount = lightOffsetAndCount.y;
+	//uint2 lightOffsetAndCount = LightClusterIndices[clusterIndex];
+	//uint startOffset = lightOffsetAndCount.x;
+	//uint lightCount = lightOffsetAndCount.y;
 	
 	// Point lights
-	for (uint i = 0; i < min(128, lightCount); i++)
-	{
-		uint index = LightClusterList[startOffset + i];
-		LightData light = PointLights[index];
+	//for (uint i = 0; i < min(128, lightCount); i++)
+	//{
+	//	uint index = LightClusterList[startOffset + i];
+	//	LightData light = PointLights[index];
 		
-		float3 L;
-		float attenuation = GetLightAttenuationAndShadow(light, worldPosition, 0.5, false, L);
-		if (!attenuation)
-			continue;
+	//	float3 L;
+	//	float attenuation = GetLightAttenuationAndShadow(light, worldPosition, 0.5, false, L);
+	//	if (!attenuation)
+	//		continue;
 		
-		float LdotV = dot(L, V);
-		float phase = lerp(HgPhase(-LdotV, ForwardScatterPhase), HgPhase(-LdotV, -BackwardScatterPhase), ScatterBlend);
-		lighting += attenuation * phase * light.color * Exposure;
-	}
+	//	float LdotV = dot(L, V);
+	//	float phase = lerp(HgPhase(-LdotV, ForwardScatterPhase), HgPhase(-LdotV, -BackwardScatterPhase), ScatterBlend);
+	//	lighting += attenuation * phase * light.color * Exposure;
+	//}
 	
 	output.lighting = lighting;
 	

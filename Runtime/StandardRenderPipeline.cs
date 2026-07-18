@@ -346,7 +346,7 @@ namespace CustomRenderPipeline
         new WaterCaustics(renderGraph, asset.OceanSettings),
 		
 		// Depends on light, plus ambient
-		new ClusteredLightCulling(asset.ClusteredLightingSettings, renderGraph),
+		new LightCulling(asset.LightingSettings, renderGraph),
         new VolumetricLighting(asset.VolumetricLightingSettings, renderGraph),
 
         new UnderwaterLighting(renderGraph, asset.OceanSettings),
@@ -411,8 +411,8 @@ namespace CustomRenderPipeline
             pass.ReadResource<SkyViewTransmittanceData>();
             pass.ReadResource<CloudShadowDataResult>();
             pass.ReadResource<VolumetricLighting.Result>();
-            pass.ReadResource<LightingSetup.Result>();
-            pass.ReadResource<ClusteredLightCulling.Result>();
+            pass.ReadResource<PointLightData>();
+            pass.ReadResource<LightCulling.Result>();
             pass.ReadResource<ParticleShadowData>();
             pass.ReadResource<VirtualTextureData>(true);
             pass.ReadResource<TerrainFrameData>(true);

@@ -16,9 +16,10 @@ Shader "Hidden/ScreenSpaceGlobalIllumination"
         Pass
         {
             HLSLPROGRAM
-            #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
+            #pragma use_dxc
+			#pragma require waveMath
             #include "SsgiCommon.hlsl"
             ENDHLSL
         }
@@ -26,9 +27,10 @@ Shader "Hidden/ScreenSpaceGlobalIllumination"
         Pass
         {
             HLSLPROGRAM
-            #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentSpatial
+            #pragma use_dxc
+			#pragma require waveMath
             #include "SsgiCommon.hlsl"
             ENDHLSL
         }
@@ -36,9 +38,10 @@ Shader "Hidden/ScreenSpaceGlobalIllumination"
 		Pass
         {
             HLSLPROGRAM
-            #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentTemporal
+            #pragma use_dxc
+			#pragma require waveMath
             #include "SsgiCommon.hlsl"
             ENDHLSL
         }

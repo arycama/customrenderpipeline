@@ -53,7 +53,8 @@ namespace CustomRenderPipeline
                 pass.ReadResource<AtmospherePropertiesAndTables>();
                 pass.ReadResource<AutoExposureData>();
                 pass.ReadResource<WaterShadowResult>();
-                pass.ReadResource<LightingSetup.Result>();
+                pass.ReadResource<PointLightData>();
+                pass.ReadResource<LightCulling.Result>();
                 pass.ReadResource<ShadowData>();
                 pass.ReadResource<DfgData>();
                 pass.ReadResource<CloudShadowDataResult>();
@@ -116,7 +117,8 @@ namespace CustomRenderPipeline
                     pass.AddKeyword("UNDERWATER_LIGHTING_ON");
 
                     pass.ReadResource<SkyReflectionAmbientData>();
-                    pass.ReadResource<LightingSetup.Result>();
+                    pass.ReadResource<PointLightData>();
+                    pass.ReadResource<LightCulling.Result>();
                     pass.ReadResource<AutoExposureData>();
                     pass.ReadResource<AtmospherePropertiesAndTables>();
                     pass.ReadResource<TerrainFrameData>(true);

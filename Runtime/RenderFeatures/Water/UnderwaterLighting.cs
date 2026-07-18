@@ -39,7 +39,8 @@ namespace CustomRenderPipeline
                 pass.ReadResource<AtmospherePropertiesAndTables>();
                 pass.ReadResource<VolumetricLighting.Result>();
                 pass.ReadResource<CloudShadowDataResult>();
-                pass.ReadResource<LightingSetup.Result>();
+                pass.ReadResource<PointLightData>();
+                pass.ReadResource<LightCulling.Result>();
                 pass.ReadResource<ShadowData>();
                 pass.ReadResource<DfgData>();
                 pass.ReadResource<WaterShadowResult>();

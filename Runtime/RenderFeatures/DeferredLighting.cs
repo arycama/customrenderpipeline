@@ -7,12 +7,10 @@ namespace CustomRenderPipeline
     public class DeferredLighting : ViewRenderFeature
     {
         private readonly Material material;
-        private readonly Sky.Settings skySettings;
 
         public DeferredLighting(RenderGraph renderGraph, Sky.Settings skySettings) : base(renderGraph)
         {
             material = new Material(Shader.Find("Hidden/Deferred Lighting")) { hideFlags = HideFlags.HideAndDontSave };
-            this.skySettings = skySettings;
         }
 
         public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
@@ -46,8 +44,8 @@ namespace CustomRenderPipeline
                 pass.ReadResource<SkyViewTransmittanceData>();
                 pass.ReadResource<CloudShadowDataResult>();
 
-                pass.ReadResource<LightingSetup.Result>();
-                pass.ReadResource<ClusteredLightCulling.Result>();
+                pass.ReadResource<PointLightData>();
+                pass.ReadResource<LightCulling.Result>();
                 pass.ReadResource<VolumetricLighting.Result>();
 
                 pass.ReadResource<ParticleShadowData>();

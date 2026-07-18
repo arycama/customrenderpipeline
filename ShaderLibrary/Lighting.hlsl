@@ -133,7 +133,7 @@ float3 EvaluateLight(LightingInput input, float diffuseTerm, float f0Avg, float3
 	return RcpPi * result;
 }
 
-float GetLightAttenuationAndShadow(LightData light, float3 position, float dither, bool softShadows, out float3 L, bool getShadows = true)
+float GetLightAttenuationAndShadow(Light light, float3 position, float dither, bool softShadows, out float3 L, bool getShadows = true)
 {
 	float3 lightVector = light.position - position;
 	float distanceSquared = dot(lightVector, lightVector);
@@ -182,18 +182,18 @@ float GetLightAttenuationAndShadow(LightData light, float3 position, float dithe
 	return attenuation;
 }
 
-float GetLightAttenuationAndShadow(LightData light, float3 position, float dither, bool softShadows, bool getShadows = true)
+float GetLightAttenuationAndShadow(Light light, float3 position, float dither, bool softShadows, bool getShadows = true)
 {
 	float3 L;
 	return GetLightAttenuationAndShadow(light, position, dither, softShadows, L, getShadows);
 }
 
-float GetLightAttenuation(LightData light, float3 position)
+float GetLightAttenuation(Light light, float3 position)
 {
 	return GetLightAttenuationAndShadow(light, position, 0.5, false, false);
 }
 
-float GetLightShadow(LightData light, float3 position, float dither, bool softShadows)
+float GetLightShadow(Light light, float3 position, float dither, bool softShadows)
 {
 	return GetLightAttenuationAndShadow(light, position, dither, softShadows, true);
 }
@@ -240,28 +240,45 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 	
 	float3 luminance = EvaluateLight(input, diffuseTerm, f0Avg, L, multiScatterTerm) * (_LightColor0 * lightTransmittance * Exposure) * shadow;
 	
-	uint3 clusterIndex;
-	clusterIndex.xy = pixelCoordinate / TileSize;
-	clusterIndex.z = log2(input.viewDepth) * ClusterScale + ClusterBias;
+	// Flat bit array iterator scalarized on entity with Z-Bin masked words
+	uint3 cluster = GetClusterIndex(float3(pixelCoordinate + 0.5, input.viewDepth));
+	uint2 lightRange = BitUnpack(LightDepthMinMax[cluster.z], 16, uint2(0, 16));
+	uint2 mergedRange = WaveReadLaneFirst(uint2(WaveActiveMin(lightRange.x), WaveActiveMax(lightRange.y))) >> 5u;
+	uint tileIndex = (cluster.y * TileCountX + cluster.x) * LightIndexCount;
 	
-	uint2 lightOffsetAndCount = LightClusterIndices[clusterIndex];
-	uint startOffset = lightOffsetAndCount.x;
-	uint lightCount = lightOffsetAndCount.y;
-	
-	// Point lightsq
-	for (uint i = 0; i < min(128, lightCount); i++)
+	// Read range of words of visibility bits
+	uint lightCount = 0;
+	for (uint i = mergedRange.x; i <= mergedRange.y; i++)
 	{
-		uint index = LightClusterList[startOffset + i];
-		LightData light = PointLights[index];
-
-		float3 L;
-		float attenuation = GetLightAttenuationAndShadow(light, input.worldPosition, 0.5, false, L);
-		if (!attenuation)
-			continue;
+		// Load bit mask data per lane
+		uint tileMask = VisibleLightBits[tileIndex + i];
 		
-		float3 lightColor = EvaluateLight(input, diffuseTerm, f0Avg, L, multiScatterTerm);
-		luminance += Exposure * attenuation * light.color * lightColor;
+		// Mask by zbin mask
+		uint localMin = clamp((int) lightRange.x - (int) (32 * i), 0, 31);
+		uint maskWidth = clamp((int) lightRange.y - (int) lightRange.x + 1, 0, 32);
+		
+		// BitFieldMask op needs manual 32 size wrap support
+		uint depthMask = maskWidth == 32u ? 0xFFFFFFFF : ((1u << maskWidth) - 1u) << localMin;
+		
+		// Compact world bitmask over all lanes in wavefront
+		uint mask = WaveReadLaneFirst(WaveActiveBitOr(tileMask & depthMask));
+		while (mask != 0u)
+		{
+			uint bitIndex = firstbitlow(mask);
+			uint lightIndex = 32u * i + bitIndex;
+			mask ^= 1u << bitIndex;
+			
+			Light light = PointLights[lightIndex];
+	
+			float3 L;
+			float attenuation = GetLightAttenuationAndShadow(light, input.worldPosition, 0.5, false, L);
+			float3 lightColor = EvaluateLight(input, diffuseTerm, f0Avg, L, multiScatterTerm);
+			luminance += Exposure * attenuation * light.color * lightColor;
+			lightCount++;
+		}
 	}
+	
+	//luminance = lerp(luminance, (lightCount >> uint3(0, 1, 2) & 1), 0.99);
 	
 	// Indirect Lighting
 	float3 iblN = input.N;

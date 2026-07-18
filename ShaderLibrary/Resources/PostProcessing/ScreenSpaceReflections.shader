@@ -12,6 +12,11 @@ Shader "Hidden/ScreenSpaceReflections"
 			ReadMask 5
 		}
 
+        HLSLINCLUDE
+        #pragma use_dxc
+		#pragma require waveMath
+		ENDHLSL
+
         Pass
         {
             HLSLPROGRAM

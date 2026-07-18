@@ -19,6 +19,8 @@ Shader "Hidden/Screen Space Shadows"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
+            #pragma use_dxc
+			#pragma require waveMath
             #include "ScreenSpaceShadows.hlsl"
             ENDHLSL
         }
@@ -28,6 +30,8 @@ Shader "Hidden/Screen Space Shadows"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentSpatial
+            #pragma use_dxc
+			#pragma require waveMath
             #include "ScreenSpaceShadows.hlsl"
             ENDHLSL
         }
@@ -37,6 +41,8 @@ Shader "Hidden/Screen Space Shadows"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentTemporal
+            #pragma use_dxc
+			#pragma require waveMath
             #include "ScreenSpaceShadows.hlsl"
             ENDHLSL
         }

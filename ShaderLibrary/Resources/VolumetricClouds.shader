@@ -7,8 +7,9 @@ Shader "Hidden/Volumetric Clouds"
         ZTest Off
 
         HLSLINCLUDE
-		#pragma target 5.0
         #pragma editor_sync_compilation
+        #pragma use_dxc
+		#pragma require waveMath
 		ENDHLSL
 
         Pass

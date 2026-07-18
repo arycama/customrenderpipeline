@@ -21,9 +21,9 @@ Shader "Hidden/Deferred Water"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
-            #pragma target 5.0
+            #pragma use_dxc
+			#pragma require waveMath
             #pragma multi_compile _ LIGHT_COUNT_ONE LIGHT_COUNT_TWO
-
             #include "DeferredWater.hlsl"
             ENDHLSL
         }
@@ -38,7 +38,8 @@ Shader "Hidden/Deferred Water"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentTemporal
-            #pragma target 5.0
+            #pragma use_dxc
+			#pragma require waveMath
             #pragma multi_compile _ RAYTRACED_REFRACTIONS_ON
             #include "DeferredWater.hlsl"
             ENDHLSL

@@ -18,6 +18,8 @@ Shader "Hidden/Physical Sky Tables"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentTransmittanceLut
+			#pragma use_dxc
+			#pragma require waveMath
             #include "PhysicalSkyTables.hlsl"
             ENDHLSL
         }
@@ -29,6 +31,8 @@ Shader "Hidden/Physical Sky Tables"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangleVolume
             #pragma fragment FragmentCdfLookup
+            #pragma use_dxc
+			#pragma require waveMath
             #include "PhysicalSkyTables.hlsl"
             ENDHLSL
         }
@@ -40,6 +44,8 @@ Shader "Hidden/Physical Sky Tables"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangleVolume
             #pragma fragment FragmentLuminance
+            #pragma use_dxc
+			#pragma require waveMath
             #include "PhysicalSkyTables.hlsl"
             ENDHLSL
         }
@@ -51,6 +57,8 @@ Shader "Hidden/Physical Sky Tables"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangleVolume
             #pragma fragment FragmentTransmittanceDepthLut
+            #pragma use_dxc
+			#pragma require waveMath
             #include "PhysicalSkyTables.hlsl"
             ENDHLSL
         }
@@ -62,6 +70,8 @@ Shader "Hidden/Physical Sky Tables"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangleVolume
             #pragma fragment FragmentViewTransmittanceLut
+            #pragma use_dxc
+			#pragma require waveMath
             #include "PhysicalSkyTables.hlsl"
             ENDHLSL
         }

@@ -3,16 +3,7 @@
 
 #include "Math.hlsl"
 
-struct DirectionalLight
-{
-	float3 color;
-	uint shadowIndex;
-	float3 direction;
-	uint cascadeCount;
-	float3x4 worldToLight;
-};
-
-struct LightData
+struct Light
 {
 	float3 position;
 	float rangeSquaredRcp;
@@ -20,6 +11,7 @@ struct LightData
 	float angleScale;
 	float3 color;
 	float angleOffset;
+	float4 cullingSphere;
 	float3 right;
 	uint lightType;
 	float3 up;
@@ -29,21 +21,7 @@ struct LightData
 	float shadowProjectionY;
 };
 
-uint PointLightCount, TileSize;
-StructuredBuffer<LightData> PointLights;
-float ClusterBias, ClusterScale;
-Texture3D<uint2> LightClusterIndices;
-StructuredBuffer<uint> LightClusterList;
 Texture2DArray<float> PointShadows, SpotShadows;
-
-const static uint LightTypeSpot = 0;
-const static uint LightTypeDirectional = 1;
-const static uint LightTypePoint = 2;
-const static uint LightTypeRectangle = 3;
-const static uint LightTypeDisc = 4;
-const static uint LightTypePyramid = 5;
-const static uint LightTypeBox = 6;
-const static uint LightTypeTube = 7;
 
 cbuffer LightingData
 {
@@ -61,6 +39,22 @@ cbuffer LightingData
 	float DirectionalShadowResolution;
 	float RcpDirectionalShadowResolution;
 };
+
+cbuffer PointLightData
+{
+	float TileSize;
+	uint LightCount;
+	uint TileCountX;
+	uint LightIndexCount;
+	
+	uint LightCullDepthSlices;
+	float LightBinWidth;
+	float LinearToLogScale;
+	float LinearToLogOffset;
+};
+
+StructuredBuffer<Light> PointLights;
+StructuredBuffer<uint> VisibleLightBits, LightDepthMinMax;
 
 float LuminanceToIlluminance(float luminance, float solidAngle)
 {
@@ -185,7 +179,6 @@ float PunctualLightAttenuation(float4 distances, float rangeAttenuationScale, fl
 	return Sq(attenuation);
 }
 
-
 float4 cubic(float v)
 {
 	float4 n = float4(1.0, 2.0, 3.0, 4.0) - v;
@@ -196,6 +189,11 @@ float4 cubic(float v)
 	o.z = s.z - 4.0 * s.y + 6.0 * s.x;
 	o.w = 6.0 - o.x - o.y - o.z;
 	return o;
+}
+
+uint3 GetClusterIndex(float3 screenPosition)
+{
+	return float3(screenPosition.xy / TileSize, log2(screenPosition.z) * LinearToLogScale + LinearToLogOffset);
 }
 
 #endif

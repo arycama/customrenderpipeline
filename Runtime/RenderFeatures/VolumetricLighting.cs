@@ -68,10 +68,10 @@ namespace CustomRenderPipeline
                 pass.ReadTexture("Input", history);
                 pass.ReadBuffer("VolumetricLightingData", volumetricLightingData);
 
-                pass.ReadResource<ClusteredLightCulling.Result>();
                 pass.ReadResource<AutoExposureData>();
                 pass.ReadResource<AtmospherePropertiesAndTables>();
-                pass.ReadResource<LightingSetup.Result>();
+                pass.ReadResource<PointLightData>();
+                pass.ReadResource<LightCulling.Result>();
                 pass.ReadResource<ShadowData>();
                 pass.ReadResource<CloudShadowDataResult>();
                 pass.ReadResource<ViewData>();

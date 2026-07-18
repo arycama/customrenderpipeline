@@ -30,9 +30,10 @@ Shader "Surface/Rain"
 			}
 
 			HLSLPROGRAM
-			#pragma target 5.0
 			#pragma vertex Vertex
 			#pragma fragment Fragment
+			#pragma use_dxc
+			#pragma require waveMath
 			#pragma multi_compile_instancing
 			#include "Rain.hlsl"
 			ENDHLSL

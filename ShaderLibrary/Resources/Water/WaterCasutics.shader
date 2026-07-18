@@ -16,7 +16,8 @@ Shader "Hidden/Water Caustics"
             HLSLPROGRAM
             #pragma vertex Vertex
             #pragma fragment Fragment
-            #pragma target 5.0
+            #pragma use_dxc
+			#pragma require waveMath
             #include "WaterCaustics.hlsl"
             ENDHLSL
         }
@@ -28,6 +29,8 @@ Shader "Hidden/Water Caustics"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentBlit
+            #pragma use_dxc
+			#pragma require waveMath
             #include "WaterCaustics.hlsl"
             ENDHLSL
         }
@@ -39,6 +42,8 @@ Shader "Hidden/Water Caustics"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentPrepare
+            #pragma use_dxc
+			#pragma require waveMath
             #include "WaterCaustics.hlsl"
             ENDHLSL
         }

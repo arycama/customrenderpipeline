@@ -46,7 +46,8 @@ namespace CustomRenderPipeline
                 using (var pass = renderGraph.AddGenericRenderPass("Specular GI Raytrace Setup"))
                 {
                     pass.ReadResource<SkyReflectionAmbientData>();
-                    pass.ReadResource<LightingSetup.Result>();
+                    pass.ReadResource<PointLightData>();
+                    pass.ReadResource<LightCulling.Result>();
                     pass.ReadResource<AutoExposureData>();
                     pass.ReadResource<AtmospherePropertiesAndTables>();
                     pass.ReadResource<TerrainFrameData>(true);
@@ -69,7 +70,8 @@ namespace CustomRenderPipeline
                     pass.ReadRtHandle<GBufferNormalRoughness>();
                     pass.ReadRtHandle<SceneColor>();
                     pass.ReadResource<SkyReflectionAmbientData>();
-                    pass.ReadResource<LightingSetup.Result>();
+                    pass.ReadResource<PointLightData>();
+                    pass.ReadResource<LightCulling.Result>();
                     pass.ReadResource<AutoExposureData>();
                     pass.ReadResource<FrameData>();
                     pass.ReadResource<ViewData>();
