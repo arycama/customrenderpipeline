@@ -1,31 +1,35 @@
 #ifndef UTILITY_INCLUDED
 #define UTILITY_INCLUDED
 
-#include "Color.hlsl"
 #include "Math.hlsl"
 #include "Random.hlsl"
 
 // TODO: Maybe template these things with macros so we don't have to define half and float types
 // Float
-float1 FastSign(float1 x) { return x >= 0.0 ? 1.0 : -1.0; };
-float2 FastSign(float2 x) { return x >= 0.0 ? 1.0 : -1.0; };
-float3 FastSign(float3 x) { return x >= 0.0 ? 1.0 : -1.0; };
-float4 FastSign(float4 x) { return x >= 0.0 ? 1.0 : -1.0; };
+bool1 select(float1 c, float1 a, float1 b) { return c ? a : b; }
+bool2 select(float2 c, float2 a, float2 b) { return c ? a : b; }
+bool3 select(float3 c, float3 a, float3 b) { return c ? a : b; }
+bool4 select(float4 c, float4 a, float4 b) { return c ? a : b; }
 
-float1 Flip(float1 a, bool1 flip) { return flip ? -a : a; }
-float2 Flip(float2 a, bool2 flip) { return flip ? -a : a; }
-float3 Flip(float3 a, bool3 flip) { return flip ? -a : a; }
-float4 Flip(float4 a, bool4 flip) { return flip ? -a : a; }
+float1 FastSign(float1 x) { return select(x >= 0.0, 1.0, -1.0); };
+float2 FastSign(float2 x) { return select(x >= 0.0, 1.0, -1.0); };
+float3 FastSign(float3 x) { return select(x >= 0.0, 1.0, -1.0); };
+float4 FastSign(float4 x) { return select(x >= 0.0, 1.0, -1.0); };
+
+float1 Flip(float1 a, bool1 flip) { return select(flip, -a, a); }
+float2 Flip(float2 a, bool2 flip) { return select(flip, -a, a); }
+float3 Flip(float3 a, bool3 flip) { return select(flip, -a, a); }
+float4 Flip(float4 a, bool4 flip) { return select(flip, -a, a); }
 
 float1 SignFlip(float1 a, float1 s) { return Flip(a, FastSign(s)); }
 float2 SignFlip(float2 a, float2 s) { return Flip(a, FastSign(s)); }
 float3 SignFlip(float3 a, float3 s) { return Flip(a, FastSign(s)); }
 float4 SignFlip(float4 a, float4 s) { return Flip(a, FastSign(s)); }
 
-void Swap(inout float1 a, inout float1 b, bool1 swap = true) { float1 t = a; a = swap ? b : a; b = swap ? t : b; }
-void Swap(inout float2 a, inout float2 b, bool2 swap = true) { float2 t = a; a = swap ? b : a; b = swap ? t : b; }
-void Swap(inout float3 a, inout float3 b, bool3 swap = true) { float3 t = a; a = swap ? b : a; b = swap ? t : b; }
-void Swap(inout float4 a, inout float4 b, bool4 swap = true) { float4 t = a; a = swap ? b : a; b = swap ? t : b; }
+void Swap(inout float1 a, inout float1 b, bool1 swap = true) { float1 t = a; a = select(swap, b, a); b = select(swap, t, b); }
+void Swap(inout float2 a, inout float2 b, bool2 swap = true) { float2 t = a; a = select(swap, b, a); b = select(swap, t, b); }
+void Swap(inout float3 a, inout float3 b, bool3 swap = true) { float3 t = a; a = select(swap, b, a); b = select(swap, t, b); }
+void Swap(inout float4 a, inout float4 b, bool4 swap = true) { float4 t = a; a = select(swap, b, a); b = select(swap, t, b); }
 
 void SignSwap(inout float1 a, inout float1 b, float1 s) { Swap(a, b, s < 0.0); }
 void SignSwap(inout float2 a, inout float2 b, float2 s) { Swap(a, b, s < 0.0); }
@@ -33,30 +37,30 @@ void SignSwap(inout float3 a, inout float3 b, float3 s) { Swap(a, b, s < 0.0); }
 void SignSwap(inout float4 a, inout float4 b, float4 s) { Swap(a, b, s < 0.0); }
 
 // Half
-half1 FastSign(half1 x) { return x >= 0.0h ? 1.0h : -1.0h; };
-half2 FastSign(half2 x) { return x >= 0.0h ? 1.0h : -1.0h; };
-half3 FastSign(half3 x) { return x >= 0.0h ? 1.0h : -1.0h; };
-half4 FastSign(half4 x) { return x >= 0.0h ? 1.0h : -1.0h; };
+bool1 select(half1 c, half1 a, half1 b) { return c ? a : b; }
+bool2 select(half2 c, half2 a, half2 b) { return c ? a : b; }
+bool3 select(half3 c, half3 a, half3 b) { return c ? a : b; }
+bool4 select(half4 c, half4 a, half4 b) { return c ? a : b; }
 
-half1 Flip(half1 a, bool1 flip) { return flip ? -a : a; }
-half2 Flip(half2 a, bool2 flip) { return flip ? -a : a; }
-half3 Flip(half3 a, bool3 flip) { return flip ? -a : a; }
-half4 Flip(half4 a, bool4 flip) { return flip ? -a : a; }
+half1 FastSign(half1 x) { return select(x >= 0.0, 1.0, -1.0); };
+half2 FastSign(half2 x) { return select(x >= 0.0, 1.0, -1.0); };
+half3 FastSign(half3 x) { return select(x >= 0.0, 1.0, -1.0); };
+half4 FastSign(half4 x) { return select(x >= 0.0, 1.0, -1.0); };
 
-half1 SignFlip(half1 a, half1 s) { return Flip(a, s < 0.0h); }
-half2 SignFlip(half2 a, half2 s) { return Flip(a, s < 0.0h); }
-half3 SignFlip(half3 a, half3 s) { return Flip(a, s < 0.0h); }
-half4 SignFlip(half4 a, half4 s) { return Flip(a, s < 0.0h); }
+half1 Flip(half1 a, bool1 flip) { return select(flip, -a, a); }
+half2 Flip(half2 a, bool2 flip) { return select(flip, -a, a); }
+half3 Flip(half3 a, bool3 flip) { return select(flip, -a, a); }
+half4 Flip(half4 a, bool4 flip) { return select(flip, -a, a); }
 
-void Swap(inout half1 a, inout half1 b, bool1 swap) { half1 t = a; a = swap ? b : a; b = swap ? t : b; }
-void Swap(inout half2 a, inout half2 b, bool2 swap) { half2 t = a; a = swap ? b : a; b = swap ? t : b; }
-void Swap(inout half3 a, inout half3 b, bool3 swap) { half3 t = a; a = swap ? b : a; b = swap ? t : b; }
-void Swap(inout half4 a, inout half4 b, bool4 swap) { half4 t = a; a = swap ? b : a; b = swap ? t : b; }
+half1 SignFlip(half1 a, half1 s) { return Flip(a, FastSign(s)); }
+half2 SignFlip(half2 a, half2 s) { return Flip(a, FastSign(s)); }
+half3 SignFlip(half3 a, half3 s) { return Flip(a, FastSign(s)); }
+half4 SignFlip(half4 a, half4 s) { return Flip(a, FastSign(s)); }
 
-void SignSwap(inout half1 a, inout half1 b, half1 s) { Swap(a, b, s < 0.0h); }
-void SignSwap(inout half2 a, inout half2 b, half2 s) { Swap(a, b, s < 0.0h); }
-void SignSwap(inout half3 a, inout half3 b, half3 s) { Swap(a, b, s < 0.0h); }
-void SignSwap(inout half4 a, inout half4 b, half4 s) { Swap(a, b, s < 0.0h); }
+void SignSwap(inout half1 a, inout half1 b, half1 s) { Swap(a, b, s < 0.0); }
+void SignSwap(inout half2 a, inout half2 b, half2 s) { Swap(a, b, s < 0.0); }
+void SignSwap(inout half3 a, inout half3 b, half3 s) { Swap(a, b, s < 0.0); }
+void SignSwap(inout half4 a, inout half4 b, half4 s) { Swap(a, b, s < 0.0); }
 
 const static uint CubemapFacePositiveX = 0;
 const static uint CubemapFaceNegativeX = 1;
@@ -423,7 +427,8 @@ float4 SampleGradient(Gradient gradient, float time)
 		color = lerp(color, gradient.colors[c].rgb, lerp(colorPos, step(0.01, colorPos), gradient.type));
 	}
 	
-	color = GammaToLinear(color);
+	// Gamma to linear.. hardcoded to avoid circular includes, this whole function should be elsewhere though
+	color = select(color <= 0.04045, color * rcp(12.92), pow((color + 0.055) * rcp(1.055), 2.4));
 	float alpha = gradient.alphas[0].x;
 	
 	[unroll]

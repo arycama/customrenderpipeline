@@ -83,7 +83,7 @@ float2 NormalToOctahedralUv(float3 n)
 {
 	n *= rcp(dot(abs(n), 1.0));
 	float t = saturate(-n.z);
-	return 0.5 * (n.xy + (n.xy >= 0.0 ? t : -t)) + 0.5;
+	return 0.5 * (n.xy + select(n.xy >= 0.0, t, -t)) + 0.5;
 }
 
 float3 OctahedralUvToNormal(float2 uv)
@@ -91,7 +91,7 @@ float3 OctahedralUvToNormal(float2 uv)
 	float2 f = 2.0 * uv - 1.0;
 	float3 n = float3(f, 1.0 - abs(f.x) - abs(f.y));
 	float t = saturate(-n.z);
-	n.xy += n.xy >= 0.0 ? -t : t;
+	n.xy += select(n.xy >= 0.0, -t, t);
 	return normalize(n);
 }
 

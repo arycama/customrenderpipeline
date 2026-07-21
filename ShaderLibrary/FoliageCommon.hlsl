@@ -1,6 +1,7 @@
 #ifndef FOLIAGE_COMMON_INCLUDED
 #define FOLIAGE_COMMON_INCLUDED
 
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Color.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Utility.hlsl"
 
 static const float4 HueVariationColor = float4(1.0, 0.75, 0.25, 0.75);

@@ -89,7 +89,7 @@ half3 ReflectivityToIorRatio(half3 reflectivity)
 	half3 numerator = r + 1.0h;
 	half3 denominator = r - 1.0h;
 	SignSwap(numerator, denominator, reflectivity);
-	return reflectivity ? numerator * rcp(denominator) : 1.0h;
+	return select(reflectivity, numerator * rcp(denominator), 1.0h);
 }
 
 // Returns srcIor / destIor, use for refract
@@ -99,7 +99,7 @@ half3 ReflectivityToRcpIorRatio(half3 reflectivity)
 	half3 numerator = r - 1.0h;
 	half3 denominator = r + 1.0h;
 	SignSwap(numerator, denominator, reflectivity);
-	return reflectivity ? numerator * rcp(denominator) : 1.0h;
+	return select(reflectivity, numerator * rcp(denominator), 1.0h);
 }
 
 half SmoothnessToPerceptualRoughness(half smoothness)

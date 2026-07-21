@@ -102,7 +102,7 @@ bool FrustumCull(float3 center, float3 extents)
 		if (i < _CullingPlanesCount)
 		{
 			float4 plane = _CullingPlanes[i];
-			float3 p = center + (plane.xyz >= 0.0 ? extents : -extents);
+			float3 p = center + select(plane.xyz >= 0.0, extents, -extents);
 			if (DistanceFromPlane(p, plane) < 0.0)
 				return false;
 		}

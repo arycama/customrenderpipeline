@@ -3,6 +3,7 @@
 #define COLOR_INCLUDED
 
 #include "Math.hlsl"
+#include "Utility.hlsl"
 
 static const uint ColorGamutSRGB = 0;
 static const uint ColorGamutRec709 = 1;
@@ -336,7 +337,7 @@ float3 OffsetICtCpToRec2020(float3 iCtCpOffset)
 // Rec 709
 float3 GammaToLinear(float3 c)
 {
-	return (c <= 0.04045) ? (c * rcp(12.92)) : (pow((c + 0.055) * rcp(1.055), 2.4));
+	return select(c <= 0.04045, c * rcp(12.92), pow((c + 0.055) * rcp(1.055), 2.4));
 }
 
 float3 XYZToRec709(float3 xyz)
@@ -370,7 +371,7 @@ float3 LinearToGamma(float3 c)
 {
 	float3 sRgbLo = c * 12.92;
 	float3 sRgbHi = pow(abs(c), rcp(2.4)) * 1.055 - 0.055;
-	return (c <= 0.0031308) ? sRgbLo : sRgbHi;
+	return select(c <= 0.0031308, sRgbLo, sRgbHi);
 }
 
 // LUV
@@ -441,23 +442,12 @@ float3 Rec709ToICtCp(float3 rec709)
 
 half3 RgbToYCbCr(half3 rgb)
 {
-	half3 yCbCr;
-	yCbCr.x = 0.2126h * rgb.r + 0.7152h * rgb.g + 0.0722h * rgb.b;
-	yCbCr.y = (rgb.b - yCbCr.x) / 1.8556h;
-	yCbCr.z = (rgb.r - yCbCr.x) / 1.5748h;
-	yCbCr.yz += 127.0h / 255.0h;
-	return yCbCr;
+	return mul(half3x4(0.2126h, 0.7152h, 0.0722h, 0.0h, -0.1146h, -0.3854h, 0.5h, 0.5h, 0.5h, -0.4542h, -0.0458h, 0.5h), half4(rgb, 1.0h));
 }
 
 half3 YCbCrToRgb(half3 yCbCr)
 {
-	yCbCr.yz -= 127.0h / 255.0h;
-    
-	half3 rgb;
-	rgb.r = yCbCr.x + 1.5748h * yCbCr.z;
-	rgb.g = yCbCr.x - (0.2126h * 1.5748h / 0.7152h) * yCbCr.z - (0.0722h * 1.1772h / 0.7152h) * yCbCr.y;
-	rgb.b = yCbCr.x + 1.8556h * yCbCr.y;
-	return rgb;
+	return mul(half3x4(1.0h, 0.0h, 1.5748h, -0.7874h, 1.0h, -0.1873h, -0.4681h, 0.3277h, 1.0h, 1.8556h, 0.0h, -0.9278h), half4(yCbCr, 1.0h));
 }
 
 float3 FastTonemap(float3 color, float luminance)

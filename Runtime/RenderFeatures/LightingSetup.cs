@@ -345,10 +345,6 @@ namespace CustomRenderPipeline
                 var minZ = light.cullingSphere.z - light.cullingSphere.w;
                 var maxZ = light.cullingSphere.z + light.cullingSphere.w;
 
-                // BitOr with covered Z bins
-                //var minBin = Max(0, (int)(Log2(minZ) * linearToLogScale + linearToLogOffset));
-                //var maxBin = Min(lightCullingSettings.DepthSlices - 1, (int)(Log2(maxZ) * linearToLogScale + linearToLogOffset));
-
                 var minBin = Max(0, (int)(minZ / binWidth));
                 var maxBin = Min(lightCullingSettings.DepthSlices - 1, (int)(maxZ / binWidth));
 
