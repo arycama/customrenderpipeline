@@ -12,6 +12,7 @@ Shader"Hidden/DistanceField"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
+            #pragma use_dxc
             #include "DistanceField.hlsl"
             ENDHLSL
         }
@@ -23,7 +24,7 @@ Shader"Hidden/DistanceField"
             #pragma fragment Fragment
             #pragma multi_compile _ FINAL_PASS
             #define JUMP_FLOOD
-            #pragma target 5.0
+            #pragma use_dxc
             #include "DistanceField.hlsl"
             ENDHLSL
         }
@@ -33,7 +34,7 @@ Shader"Hidden/DistanceField"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentDistance
-            #pragma target 5.0
+            #pragma use_dxc
             #include "DistanceField.hlsl"
             ENDHLSL
         }
@@ -43,7 +44,7 @@ Shader"Hidden/DistanceField"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentCombine
-            #pragma target 5.0
+            #pragma use_dxc
             #include "DistanceField.hlsl"
             ENDHLSL
         }
@@ -55,7 +56,7 @@ Shader"Hidden/DistanceField"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentMip
-            #pragma target 5.0
+            #pragma use_dxc
             #include "DistanceField.hlsl"
             ENDHLSL
         }

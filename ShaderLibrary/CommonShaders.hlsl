@@ -7,8 +7,11 @@ struct VertexInput
 {
 	uint id : SV_VertexID;
 	
-	#if defined(STEREO_MULTIVIEW_ON) && defined(UNITY_COMPILER_DXC)
-		[[vk::ext_decorate(11, 4440)]] uint viewIndex : VIEWIDX;
+	#if defined(STEREO_MULTIVIEW_ON)
+		#ifdef SHADER_STAGE_VERTEX
+			[[vk::ext_decorate(11, 4440)]]
+		#endif
+		uint viewIndex : VIEWIDX;
 	#endif
 };
 
@@ -19,6 +22,11 @@ struct VertexFullscreenTriangleMinimalOutput
 	
 	#ifdef STEREO_INSTANCING_ON
 		uint viewIndex : SV_RenderTargetArrayIndex;
+	#elif defined(STEREO_MULTIVIEW_ON)
+		#ifdef SHADER_STAGE_FRAGMENT
+			[[vk::ext_decorate(11, 4440)]]
+		#endif
+		uint viewIndex : VIEWIDX;
 	#endif
 };
 
@@ -30,14 +38,11 @@ struct VertexFullscreenTriangleOutput
 	
 	#ifdef STEREO_INSTANCING_ON
 		uint viewIndex : SV_RenderTargetArrayIndex;
-	#else
-		#if defined(STEREO_MULTIVIEW_ON) && defined(UNITY_COMPILER_DXC)
-			#ifdef SHADER_STAGE_FRAGMENT
-				[[vk::ext_decorate(11, 4440)]] uint viewIndex : VIEWIDX;
-			#else
-				uint viewIndex : VIEWIDX;
-			#endif
+	#elif defined(STEREO_MULTIVIEW_ON)
+		#ifdef SHADER_STAGE_FRAGMENT
+			[[vk::ext_decorate(11, 4440)]]
 		#endif
+		uint viewIndex : VIEWIDX;
 	#endif
 };
 
@@ -61,11 +66,7 @@ void VertexFullscreenTriangleInternal(VertexInput input, out float4 position, ou
 	cornerId = input.id;
 	
 	#ifdef STEREO_MULTIVIEW_ON
-		#ifdef UNITY_COMPILER_DXC
-			cornerId += 3u * input.viewIndex;
-		#else
-			cornerId += 3u * gl_ViewID;
-		#endif
+		cornerId += 3u * input.viewIndex;
 	#endif
 }
 

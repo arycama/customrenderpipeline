@@ -21,6 +21,7 @@ Shader "Hidden/Camera Motion Vectors"
             #pragma editor_sync_compilation
             #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment Fragment
+            #pragma use_dxc
             #include "CameraMotionVectors.hlsl"
             ENDHLSL
         }
@@ -33,6 +34,7 @@ Shader "Hidden/Camera Motion Vectors"
             #pragma editor_sync_compilation
             #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentPreDilate
+            #pragma use_dxc
             #include "CameraMotionVectors.hlsl"
             ENDHLSL
         }

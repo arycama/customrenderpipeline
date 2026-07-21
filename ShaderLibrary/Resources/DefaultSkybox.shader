@@ -12,6 +12,7 @@ Shader "Hidden/Default Skybox"
 			HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangleMinimal
 			#pragma fragment Fragment
+            #pragma use_dxc
 			#include "DefaultSkybox.hlsl"
 			ENDHLSL
 		}

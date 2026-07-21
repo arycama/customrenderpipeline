@@ -16,9 +16,9 @@ Shader "Hidden/Rain Composite"
         Pass
         {
             HLSLPROGRAM
-            #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
+            #pragma use_dxc
             #include "RainComposite.hlsl"
             ENDHLSL
         }

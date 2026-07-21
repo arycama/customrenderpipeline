@@ -30,9 +30,9 @@ Shader "Surface/Decal"
 			ZWrite Off
 
 			HLSLPROGRAM
-			#pragma target 5.0
 			#pragma vertex Vertex
 			#pragma fragment Fragment
+			#pragma use_dxc
 			#pragma multi_compile_instancing
 			#include "Decal.hlsl"
 			ENDHLSL

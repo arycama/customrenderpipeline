@@ -11,6 +11,7 @@ Shader "Hidden/Reproject Previous Frame"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment Fragment
+            #pragma use_dxc
             #include "ReprojectPreviousFrame.hlsl"
             ENDHLSL
         }

@@ -17,11 +17,11 @@ Shader "Hidden/Screen Space Terrain"
             }
 
             HLSLPROGRAM
-            #pragma target 5.0
             #pragma editor_sync_compilation
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
             #pragma multi_compile _ VIRTUAL_TEXTURING_ON
+            #pragma use_dxc
             #include "ScreenSpaceTerrain.hlsl"
             ENDHLSL
         }

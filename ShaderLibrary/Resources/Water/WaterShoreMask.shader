@@ -11,6 +11,7 @@ Shader"Hidden/WaterShoreMask"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentSeed
+            #pragma use_dxc
             #include "WaterShoreMask.hlsl"
             ENDHLSL
         }
@@ -20,8 +21,8 @@ Shader"Hidden/WaterShoreMask"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentJumpFlood
+            #pragma use_dxc
             #pragma multi_compile _ FINAL_PASS
-            #pragma target 5.0
             #include "WaterShoreMask.hlsl"
             ENDHLSL
         }
@@ -31,6 +32,7 @@ Shader"Hidden/WaterShoreMask"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentCombine
+            #pragma use_dxc
             #include "WaterShoreMask.hlsl"
             ENDHLSL
         }

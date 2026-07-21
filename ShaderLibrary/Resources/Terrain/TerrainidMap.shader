@@ -13,6 +13,7 @@ Shader "Hidden/Terrain Id Map"
             #pragma editor_sync_compilation
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
+            #pragma use_dxc
             #include "TerrainIdMap.hlsl"
             ENDHLSL
         }

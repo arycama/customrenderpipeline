@@ -5,10 +5,10 @@ Shader "Hidden/Virtual Texture Build"
         Pass
         {
             HLSLPROGRAM
-            #pragma target 5.0
             #pragma editor_sync_compilation
             #pragma vertex VertexFullscreenTriangleVolume
             #pragma fragment Fragment
+            #pragma use_dxc
             #include "VirtualTextureBuild.hlsl"
             ENDHLSL
         }

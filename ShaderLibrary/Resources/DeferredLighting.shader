@@ -80,7 +80,6 @@ Shader "Hidden/Deferred Lighting"
             #pragma use_dxc
 			#pragma require waveMath
             #pragma editor_sync_compilation
-            #pragma target 5.0
             #define UNDERWATER_LIGHTING_ON
             #include "DeferredLighting.hlsl"
             ENDHLSL

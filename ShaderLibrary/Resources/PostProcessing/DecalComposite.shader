@@ -19,9 +19,9 @@ Shader "Hidden/Decal Composite"
             Name "Copy"
 
             HLSLPROGRAM
-            #pragma target 5.0
             #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentCopy
+            #pragma use_dxc
             #include "DecalComposite.hlsl"
             ENDHLSL
         }
@@ -31,9 +31,9 @@ Shader "Hidden/Decal Composite"
             Name "Combine"
 
             HLSLPROGRAM
-            #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentCombine
+            #pragma use_dxc
             #include "DecalComposite.hlsl"
             ENDHLSL
         }

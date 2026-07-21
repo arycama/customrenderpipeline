@@ -235,12 +235,4 @@ uint GetViewId()
 	return 0;
 }
 
-#if defined(STEREO_MULTIVIEW_ON) && !defined(UNITY_COMPILER_DXC)
-	cbuffer OVR_multiview
-	{
-		uint gl_ViewID;
-		uint numViews_2;
-	};
-#endif
-
 #endif
