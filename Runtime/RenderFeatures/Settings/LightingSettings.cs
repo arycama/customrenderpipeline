@@ -7,10 +7,6 @@ public class LightingSettings
 	[field: SerializeField] public bool MicroShadows { get; private set; } = true;
 	[field: SerializeField, Range(1e-3f, 180)] public float SunAngularDiameter { get; private set; } = 0.52f;
 
-    [field: Header("Light Culling")]
-    [field: SerializeField, Pow2(128)] public int TileSize { get; private set; } = 32;
-    [field: SerializeField, Pow2(8192)] public int DepthSlices { get; private set; } = 8192;
-
     [field: Header("Sun Shadows")]
     [field: SerializeField, Min(0.0f), Tooltip("Length of fadeout for directional shadow")] public float DirectionalFadeLength { get; private set; } = 16f;
     [field: SerializeField, Range(0, 5)] public int DirectionalMaxFilterSize { get; private set; } = 1;

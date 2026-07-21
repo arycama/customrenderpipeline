@@ -9,7 +9,7 @@ using static Unmath.Math;
 namespace CustomRenderPipeline
 {
     [CustomEditor(typeof(Light)), SupportedOnRenderPipeline(typeof(CustomRenderPipelineAssetBase))]
-    public class CustomLightEditor : LightEditor
+    public class LightEditor : UnityEditor.LightEditor
     {
         private float previousSolidAngle;
 
@@ -93,6 +93,7 @@ namespace CustomRenderPipeline
 
             settings.DrawColor();
             settings.shadowsType.intValue = EditorGUILayout.Toggle("Shadows", settings.shadowsType.intValue != 0) ? 2 : 0;
+            _ = EditorGUILayout.PropertyField(settings.shadowsNearPlane);
 
             _ = EditorGUILayout.PropertyField(settings.lightType);
 

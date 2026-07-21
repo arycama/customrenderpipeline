@@ -193,6 +193,7 @@ float4 cubic(float v)
 
 uint3 GetClusterIndex(float3 screenPosition)
 {
+	return float3(screenPosition.xy / TileSize, screenPosition.z / LightBinWidth);
 	return float3(screenPosition.xy / TileSize, log2(screenPosition.z) * LinearToLogScale + LinearToLogOffset);
 }
 

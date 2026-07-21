@@ -332,7 +332,7 @@ namespace CustomRenderPipeline
         new GenerateHiZ(renderGraph, GenerateHiZ.HiZMode.Max),
 
 		// Light processing
-		new LightingSetup(renderGraph, asset.LightingSettings),
+		new LightingSetup(renderGraph, asset.LightingSettings, asset.LightCulling),
         new PhysicalSkyGenerateData(asset.Sky, asset.Clouds, renderGraph),
 
         new ShadowRenderer(renderGraph, asset.LightingSettings, terrainShadowRenderer, gpuDrivenRenderer),
@@ -346,7 +346,7 @@ namespace CustomRenderPipeline
         new WaterCaustics(renderGraph, asset.OceanSettings),
 		
 		// Depends on light, plus ambient
-		new LightCulling(asset.LightingSettings, renderGraph),
+		new LightCulling(asset.LightCulling, renderGraph, Resources.Load<ComputeShader>("LightCulling")),
         new VolumetricLighting(asset.VolumetricLightingSettings, renderGraph),
 
         new UnderwaterLighting(renderGraph, asset.OceanSettings),

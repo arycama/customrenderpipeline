@@ -7,26 +7,33 @@ namespace CustomRenderPipeline
 {
     public class LightCulling : ViewRenderFeature
     {
-        private readonly LightingSettings settings;
+        [Serializable]
+        public class Settings
+        {
+            [field: SerializeField, Pow2(128)] public int TileSize { get; private set; } = 16;
+            [field: SerializeField, Pow2(8192)] public int DepthSlices { get; private set; } = 8192;
+        }
+
+        private readonly Settings settings;
         private readonly ComputeShader computeShader;
 
-        public LightCulling(LightingSettings settings, RenderGraph renderGraph) : base(renderGraph)
+        public LightCulling(Settings settings, RenderGraph renderGraph, ComputeShader computeShader) : base(renderGraph)
         {
             this.settings = settings;
-            computeShader = Resources.Load<ComputeShader>("LightCulling");
+            this.computeShader = computeShader;
         }
 
         public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
         {
+            if (!renderGraph.TryGetResource<PointLightData>(out var pointLightData))
+                return;
+
             var tileCountX = DivRoundUp(viewPassData.viewSize.x, settings.TileSize);
             var tileCountY = DivRoundUp(viewPassData.viewSize.y, settings.TileSize);
             var tileCount = tileCountX * tileCountY;
 
-            var pointLightData = renderGraph.GetResource<PointLightData>();
-            var pointLightCount = pointLightData.lightCount;
-
-            var lightIndexCount = DivRoundUp(pointLightCount, 32);
-            var visibleLightBits = renderGraph.GetBuffer(Max(1, lightIndexCount * tileCount));
+            var lightIndexCount = DivRoundUp(pointLightData.lightCount, 32);
+            var visibleLightBits = renderGraph.GetBuffer(lightIndexCount * tileCount);
 
             using (var pass = renderGraph.AddComputeRenderPass("Light Culling"))
             {

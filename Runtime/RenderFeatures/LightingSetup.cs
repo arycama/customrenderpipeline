@@ -15,12 +15,13 @@ namespace CustomRenderPipeline
         private readonly LightingSettings settings;
         private readonly NativeList<LightShadowCasterCullingInfo> perLightInfos = new(1, Allocator.Persistent);
         private readonly NativeList<ShadowSplitData> splitBuffer = new(1, Allocator.Persistent);
+        private readonly LightCulling.Settings lightCullingSettings;
 
         private LightData[] pointLights = new LightData[8];
         private float[] pointLightDepths = new float[8];
         private int[] lightDepthBins, lightDepthMinMax;
 
-        public LightingSetup(RenderGraph renderGraph, LightingSettings settings) : base(renderGraph)
+        public LightingSetup(RenderGraph renderGraph, LightingSettings settings, LightCulling.Settings lightCullingSettings) : base(renderGraph)
         {
             this.settings = settings;
         }
@@ -323,19 +324,19 @@ namespace CustomRenderPipeline
             Array.Sort(pointLightDepths, pointLights);
 
             // Resize Z bins if needed and clear
-            Array.Resize(ref lightDepthBins, settings.DepthSlices);
+            Array.Resize(ref lightDepthBins, lightCullingSettings.DepthSlices);
             Array.Clear(lightDepthBins, 0, lightDepthBins.Length);
 
-            Array.Resize(ref lightDepthMinMax, settings.DepthSlices);
+            Array.Resize(ref lightDepthMinMax, lightCullingSettings.DepthSlices);
             for (var i = 0; i < lightDepthMinMax.Length; i++)
                 lightDepthMinMax[i] = BitPack(ushort.MaxValue, 16, 0) | BitPack(0, 16, 16);
 
-            var numSlices = settings.DepthSlices;
+            var numSlices = lightCullingSettings.DepthSlices;
             var linearToLogScale = numSlices / Log2(viewPassData.far / viewPassData.near);
             var linearToLogOffset = -Log2(viewPassData.near) * linearToLogScale;
 
             // Add sorted lights to list
-            var binWidth = viewPassData.far / settings.DepthSlices;
+            var binWidth = viewPassData.far / lightCullingSettings.DepthSlices;
             for (var i = 0; i < pointLightCount; i++)
             {
                 var light = pointLights[i];
@@ -345,8 +346,11 @@ namespace CustomRenderPipeline
                 var maxZ = light.cullingSphere.z + light.cullingSphere.w;
 
                 // BitOr with covered Z bins
-                var minBin = Max(0, (int)(Log2(minZ) * linearToLogScale + linearToLogOffset));
-                var maxBin = Min(settings.DepthSlices - 1, (int)(Log2(maxZ) * linearToLogScale + linearToLogOffset));
+                //var minBin = Max(0, (int)(Log2(minZ) * linearToLogScale + linearToLogOffset));
+                //var maxBin = Min(lightCullingSettings.DepthSlices - 1, (int)(Log2(maxZ) * linearToLogScale + linearToLogOffset));
+
+                var minBin = Max(0, (int)(minZ / binWidth));
+                var maxBin = Min(lightCullingSettings.DepthSlices - 1, (int)(maxZ / binWidth));
 
                 for (var j = minBin; j <= maxBin; j++)
                 {
@@ -365,8 +369,8 @@ namespace CustomRenderPipeline
             }
 
             var pointLightBuffer = pointLightCount == 0 ? renderGraph.EmptyBuffer : renderGraph.GetBuffer(pointLightCount, UnsafeUtility.SizeOf<LightData>());
-            var lightDepthBinBuffer = renderGraph.GetBuffer(settings.DepthSlices);
-            var lightDepthMinMaxBuffer = renderGraph.GetBuffer(settings.DepthSlices);
+            var lightDepthBinBuffer = renderGraph.GetBuffer(lightCullingSettings.DepthSlices);
+            var lightDepthMinMaxBuffer = renderGraph.GetBuffer(lightCullingSettings.DepthSlices);
 
             using (var pass = renderGraph.AddGenericRenderPass("Set Light Data", (pointLights, pointLightCount, pointLightBuffer, lightDepthBinBuffer, lightDepthBins, lightDepthMinMaxBuffer, lightDepthMinMax)))
             {
@@ -381,17 +385,17 @@ namespace CustomRenderPipeline
                 });
             }
 
-            var tileCountX = DivRoundUp(viewPassData.viewSize.x, settings.TileSize);
-            var tileCountY = DivRoundUp(viewPassData.viewSize.y, settings.TileSize);
+            var tileCountX = DivRoundUp(viewPassData.viewSize.x, lightCullingSettings.TileSize);
+            var tileCountY = DivRoundUp(viewPassData.viewSize.y, lightCullingSettings.TileSize);
             var lightIndexCount = DivRoundUp(pointLightCount, 32);
 
             var pointLightData = renderGraph.SetConstantBuffer
             ((
-                (float)settings.TileSize,
+                (float)lightCullingSettings.TileSize,
                 pointLightCount,
-                DivRoundUp(viewPassData.viewSize.x, settings.TileSize),
+                DivRoundUp(viewPassData.viewSize.x, lightCullingSettings.TileSize),
                 lightIndexCount,
-                settings.DepthSlices,
+                lightCullingSettings.DepthSlices,
                 binWidth,
                 linearToLogScale,
                 linearToLogOffset
