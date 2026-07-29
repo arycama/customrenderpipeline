@@ -6,7 +6,7 @@ uint GetThreadsPerTile();
 float2 PixelToClipPosition(float2 pixel);
 float GetNearPlane();
 matrix GetViewToClip(uint viewIndex);
-void WriteResult(uint result, uint index);
+void WriteResult(uint result, uint3 index);
 
 // Ref https://jcgt.org/published/0002/02/05/paper.pdf
 // TODO: This can still be simplified/optimised further
@@ -109,7 +109,6 @@ void LightCulling(uint3 id, uint2 groupId)
 		if (laneIndex)
 			continue;
 			
-		uint tileIndex = groupId.y * TileCountX + groupId.x;
-		WriteResult(visibleBits, tileIndex * LightIndexCount + i);
+		WriteResult(visibleBits, uint3(groupId, i));
 	}
 }

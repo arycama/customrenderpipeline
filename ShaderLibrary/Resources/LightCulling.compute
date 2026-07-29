@@ -5,7 +5,7 @@
 #include "../Common.hlsl"
 #include "../LightCullingCommon.hlsl"
 
-RWStructuredBuffer<uint> VisibleLightBitsWrite;
+RWTexture2DArray<uint> VisibleLightBitsWrite;
 
 const static uint ThreadsPerTile = 32;
 
@@ -29,7 +29,7 @@ matrix GetViewToClip(uint viewIndex)
 	return ViewToClip;
 }
 
-void WriteResult(uint result, uint index)
+void WriteResult(uint result, uint3 index)
 {
 	VisibleLightBitsWrite[index] = result;
 }

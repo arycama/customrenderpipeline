@@ -52,13 +52,12 @@ void Compute(uint3 id : SV_DispatchThreadID)
 	uint3 cluster = GetClusterIndex(float3(id.xy + 0.5, eyeDepth));
 	uint2 lightRange = LightDepthRanges[uint2(cluster.z, 0)];
 	uint2 mergedRange = WaveReadLaneFirst(uint2(WaveActiveMin(lightRange.x), WaveActiveMax(lightRange.y))) >> 5u;
-	uint tileIndex = (cluster.y * TileCountX + cluster.x) * LightIndexCount;
 	
 	// Read range of words of visibility bits
 	for (uint i = mergedRange.x; i <= mergedRange.y; i++)
 	{
 		// Load bit mask data per lane
-		uint tileMask = VisibleLightBits[tileIndex + i];
+		uint tileMask = VisibleLightBits[uint3(cluster.xy, i)];
 		
 		// Mask by zbin mask
 		uint localMin = clamp((int) lightRange.x - (int) (32 * i), 0, 31);

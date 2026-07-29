@@ -54,8 +54,8 @@ cbuffer PointLightData
 };
 
 StructuredBuffer<Light> PointLights;
-StructuredBuffer<uint> VisibleLightBits;
 Texture2D<min16uint2> LightDepthRanges;
+Texture2DArray<uint> VisibleLightBits;
 
 float LuminanceToIlluminance(float luminance, float solidAngle)
 {
@@ -112,42 +112,12 @@ float ComputeCubeToSphereMapSqMagnitude(float3 v)
 	return dot(v, v) - v2.x * v2.y - v2.y * v2.z - v2.z * v2.x + v2.x * v2.y * v2.z;
 }
 
-float DistanceWindowing(float distSquare, float rangeAttenuationScale, float rangeAttenuationBias)
-{
-	return saturate(rangeAttenuationBias - Sq(distSquare * rangeAttenuationScale));
-}
-
 float SmoothDistanceWindowing(float distSquare, float rangeAttenuationScale, float rangeAttenuationBias)
 {
-	return Sq(DistanceWindowing(distSquare, rangeAttenuationScale, rangeAttenuationBias));
+	return Sq(saturate(rangeAttenuationBias - Sq(distSquare * rangeAttenuationScale)));
 }
 
-float EllipsoidalDistanceAttenuation(float3 unL, float3 axis, float invAspectRatio, float rangeAttenuationScale, float rangeAttenuationBias)
-{
-    // Project the unnormalized light vector onto the axis.
-	float projL = dot(unL, axis);
-
-    // Transform the light vector so that we can work with
-    // with the ellipsoid as if it was a sphere with the radius of light's range.
-	float diff = projL - projL * invAspectRatio;
-	unL -= diff * axis;
-
-	float sqDist = dot(unL, unL);
-	return SmoothDistanceWindowing(sqDist, rangeAttenuationScale, rangeAttenuationBias);
-}
-
-float EllipsoidalDistanceAttenuation(float3 unL, float3 invHalfDim, float rangeAttenuationScale, float rangeAttenuationBias)
-{
-    // Transform the light vector so that we can work with
-    // with the ellipsoid as if it was a unit sphere.
-	unL *= invHalfDim;
-
-	float sqDist = dot(unL, unL);
-	return SmoothDistanceWindowing(sqDist, rangeAttenuationScale, rangeAttenuationBias);
-}
-
-float BoxDistanceAttenuation(float3 unL, float3 invHalfDim,
-                            float rangeAttenuationScale, float rangeAttenuationBias)
+float BoxDistanceAttenuation(float3 unL, float3 invHalfDim, float rangeAttenuationScale, float rangeAttenuationBias)
 {
 	float attenuation = 0.0;
 
@@ -164,22 +134,6 @@ float BoxDistanceAttenuation(float3 unL, float3 invHalfDim,
 	return attenuation;
 }
 
-float PunctualLightAttenuation(float4 distances, float rangeAttenuationScale, float rangeAttenuationBias,
-                              float lightAngleScale, float lightAngleOffset)
-{
-	float distSq = distances.y;
-	float distRcp = distances.z;
-	float distProj = distances.w;
-	float cosFwd = distProj * distRcp;
-
-	float attenuation = min(distRcp, 1.0 / 0.01);
-	attenuation *= DistanceWindowing(distSq, rangeAttenuationScale, rangeAttenuationBias);
-	attenuation *= saturate(cosFwd * lightAngleScale + lightAngleOffset); // Smooth angle atten
-
-	// Sqquare smooth angle atten
-	return Sq(attenuation);
-}
-
 float4 cubic(float v)
 {
 	float4 n = float4(1.0, 2.0, 3.0, 4.0) - v;
@@ -194,7 +148,7 @@ float4 cubic(float v)
 
 float3 GetClusterIndex(float3 screenPosition)
 {
-	return floor(float3(screenPosition.xy * RcpTileSize, screenPosition.z * RcpBinWidth));
+	return float3(screenPosition.xy * RcpTileSize, screenPosition.z * RcpBinWidth);
 }
 
 #endif

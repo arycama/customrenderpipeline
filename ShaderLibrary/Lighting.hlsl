@@ -241,17 +241,16 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 	float3 luminance = EvaluateLight(input, diffuseTerm, f0Avg, L, multiScatterTerm) * (_LightColor0 * lightTransmittance * Exposure) * shadow;
 	
 	// Flat bit array iterator scalarized on entity with Z-Bin masked words
-	uint3 cluster = GetClusterIndex(float3(pixelCoordinate + 0.5, input.viewDepth));
+	float3 cluster = GetClusterIndex(float3(pixelCoordinate + 0.5, input.viewDepth));
 	uint2 lightRange = LightDepthRanges[uint2(cluster.z, 0)];
-	uint2 mergedRange = WaveReadLaneFirst(uint2(WaveActiveMin(lightRange.x), WaveActiveMax(lightRange.y))) >> 5u;
-	uint tileIndex = (cluster.y * TileCountX + cluster.x) * LightIndexCount;
+	uint2 mergedRange = uint2(WaveActiveMin(lightRange.x), WaveActiveMax(lightRange.y)) >> 5u;
 	
 	// Read range of words of visibility bits
 	uint lightCount = 0;
 	for (uint i = mergedRange.x; i <= mergedRange.y; i++)
 	{
 		// Load bit mask data per lane
-		uint tileMask = VisibleLightBits[tileIndex + i];
+		uint tileMask = VisibleLightBits[uint3(cluster.xy, i)];
 		
 		// Mask by zbin mask
 		uint localMin = clamp((int) lightRange.x - (int) (32 * i), 0, 31);
@@ -261,7 +260,7 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 		uint depthMask = maskWidth == 32u ? 0xFFFFFFFF : ((1u << maskWidth) - 1u) << localMin;
 		
 		// Compact world bitmask over all lanes in wavefront
-		uint mask = WaveReadLaneFirst(WaveActiveBitOr(tileMask & depthMask));
+		uint mask = WaveActiveBitOr(tileMask & depthMask);
 		while (mask != 0u)
 		{
 			uint bitIndex = firstbitlow(mask);

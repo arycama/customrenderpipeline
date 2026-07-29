@@ -6,18 +6,18 @@
 
 RWTexture2D<min16uint2> Result;
 
-const static uint ThreadCount = 32u;
+const static min16uint ThreadCount = 32u;
 
 [numthreads(ThreadCount, 1, 1)]
-void CSMain(uint binIndex : SV_GroupID)
+void CSMain(min16uint binIndex : SV_GroupID)
 {
-	int laneIndex = WaveGetLaneIndex();
-	int minIndex = IntMax;
-	int maxIndex = 0;
+	min16uint laneIndex = WaveGetLaneIndex();
+	min16uint minIndex = 65536u;
+	min16uint maxIndex = 0u;
 	
-	for (int i = 0; i < LightIndexCount; i++)
+	for (min16uint i = 0; i < LightIndexCount; i++)
 	{
-		int index = i * ThreadCount + laneIndex;
+		min16uint index = i * ThreadCount + laneIndex;
 		if (index >= LightCount)
 			continue;
 			
@@ -27,8 +27,8 @@ void CSMain(uint binIndex : SV_GroupID)
 		float minZ = light.cullingSphere.z - light.cullingSphere.w;
 		float maxZ = light.cullingSphere.z + light.cullingSphere.w;
 			
-		int minBin = max(0u, (int) (minZ / LightBinWidth));
-		int maxBin = min(LightCullDepthSlices - 1u, (int) (maxZ / LightBinWidth));
+		min16uint minBin = max(0u, (min16uint) (minZ * RcpBinWidth));
+		min16uint maxBin = min(LightCullDepthSlices - 1u, (min16uint) (maxZ * RcpBinWidth));
 		
 		// Check if this bin is within the light's min+max range.
 		if (binIndex < minBin || binIndex > maxBin)
@@ -44,5 +44,5 @@ void CSMain(uint binIndex : SV_GroupID)
 	if (laneIndex)
 		return;
 	
-	Result[int2(binIndex, 0)] = int2(minIndex, maxIndex);
+	Result[min16uint2(binIndex, 0u)] = min16uint2(minIndex, maxIndex);
 }

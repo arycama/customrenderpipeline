@@ -32,7 +32,6 @@ namespace CustomRenderPipeline
 
             var tileCountX = DivRoundUp(viewPassData.viewSize.x, settings.TileSize);
             var tileCountY = DivRoundUp(viewPassData.viewSize.y, settings.TileSize);
-            var tileCount = tileCountX * tileCountY;
 
             var lightIndexCount = DivRoundUp(pointLightData.lightCount, 32);
             var lightDepthRanges = renderGraph.GetTexture(new(settings.DepthSlices, 1), GraphicsFormat.R16G16_UInt);
@@ -46,34 +45,34 @@ namespace CustomRenderPipeline
                 pass.ReadResource<ViewData>();
             }
 
-            var visibleLightBits = renderGraph.GetBuffer(lightIndexCount * tileCount);
+            var visibleLightBits = renderGraph.GetTexture(new(tileCountX, tileCountY), GraphicsFormat.R32_UInt, lightIndexCount, TextureDimension.Tex2DArray);
             using (var pass = renderGraph.AddComputeRenderPass("Light Culling"))
             {
                 pass.Initialize(computeShader, 0, tileCountX, tileCountY, viewPassData.viewCount, false);
                 pass.ReadResource<PointLightData>();
 
-                pass.WriteBuffer("VisibleLightBitsWrite", visibleLightBits);
+                pass.WriteTexture("VisibleLightBitsWrite", visibleLightBits);
                 pass.ReadResource<ViewData>();
             }
 
-            renderGraph.SetResource(new Result(visibleLightBits, lightDepthRanges));
+            renderGraph.SetResource(new Result(lightDepthRanges, visibleLightBits));
         }
 
         public readonly struct Result : IRenderPassData
         {
-            private readonly ResourceHandle<GraphicsBuffer> visibleLightBits;
             private readonly ResourceHandle<RenderTexture> lightDepthRanges;
+            private readonly ResourceHandle<RenderTexture> visibleLightBits;
 
-            public Result(ResourceHandle<GraphicsBuffer> visibleLightBits, ResourceHandle<RenderTexture> lightDepthRanges)
+            public Result(ResourceHandle<RenderTexture> lightDepthRanges, ResourceHandle<RenderTexture> visibleLightBits)
             {
-                this.visibleLightBits = visibleLightBits;
                 this.lightDepthRanges = lightDepthRanges;
+                this.visibleLightBits = visibleLightBits;
             }
 
             public void SetInputs(RenderPass pass)
             {
-                pass.ReadBuffer("VisibleLightBits", visibleLightBits);
                 pass.ReadTexture("LightDepthRanges", lightDepthRanges);
+                pass.ReadTexture("VisibleLightBits", visibleLightBits);
             }
 
             public void SetProperties(RenderPass pass, CommandBuffer command)
