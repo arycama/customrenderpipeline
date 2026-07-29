@@ -49,12 +49,13 @@ cbuffer PointLightData
 	
 	uint LightCullDepthSlices;
 	float LightBinWidth;
-	float LinearToLogScale;
-	float LinearToLogOffset;
+	float RcpTileSize;
+	float RcpBinWidth;
 };
 
 StructuredBuffer<Light> PointLights;
-StructuredBuffer<uint> VisibleLightBits, LightDepthMinMax;
+StructuredBuffer<uint> VisibleLightBits;
+Texture2D<min16uint2> LightDepthRanges;
 
 float LuminanceToIlluminance(float luminance, float solidAngle)
 {
@@ -193,7 +194,7 @@ float4 cubic(float v)
 
 float3 GetClusterIndex(float3 screenPosition)
 {
-	return floor(float3(screenPosition.xy / TileSize, screenPosition.z / LightBinWidth));
+	return floor(float3(screenPosition.xy * RcpTileSize, screenPosition.z * RcpBinWidth));
 }
 
 #endif

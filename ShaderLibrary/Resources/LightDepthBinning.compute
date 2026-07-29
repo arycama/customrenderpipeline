@@ -1,0 +1,48 @@
+#pragma kernel CSMain
+#pragma use_dxc
+#pragma require waveMath
+
+#include "../LightingCommon.hlsl"
+
+RWTexture2D<min16uint2> Result;
+
+const static uint ThreadCount = 32u;
+
+[numthreads(ThreadCount, 1, 1)]
+void CSMain(uint binIndex : SV_GroupID)
+{
+	int laneIndex = WaveGetLaneIndex();
+	int minIndex = IntMax;
+	int maxIndex = 0;
+	
+	for (int i = 0; i < LightIndexCount; i++)
+	{
+		int index = i * ThreadCount + laneIndex;
+		if (index >= LightCount)
+			continue;
+			
+		Light light = PointLights[index];
+			
+		// Calculate min and max view depth
+		float minZ = light.cullingSphere.z - light.cullingSphere.w;
+		float maxZ = light.cullingSphere.z + light.cullingSphere.w;
+			
+		int minBin = max(0u, (int) (minZ / LightBinWidth));
+		int maxBin = min(LightCullDepthSlices - 1u, (int) (maxZ / LightBinWidth));
+		
+		// Check if this bin is within the light's min+max range.
+		if (binIndex < minBin || binIndex > maxBin)
+			continue;
+			
+		minIndex = min(minIndex, index);
+		maxIndex = max(maxIndex, index);
+	}
+	
+	minIndex = WaveActiveMin(minIndex);
+	maxIndex = WaveActiveMax(maxIndex);
+	
+	if (laneIndex)
+		return;
+	
+	Result[int2(binIndex, 0)] = int2(minIndex, maxIndex);
+}

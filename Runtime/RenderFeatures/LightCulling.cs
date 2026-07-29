@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using static Unmath.Math;
 
@@ -15,12 +16,13 @@ namespace CustomRenderPipeline
         }
 
         private readonly Settings settings;
-        private readonly ComputeShader computeShader;
+        private readonly ComputeShader computeShader, depthBinningComputeShader;
 
         public LightCulling(Settings settings, RenderGraph renderGraph, ComputeShader computeShader) : base(renderGraph)
         {
             this.settings = settings;
             this.computeShader = computeShader;
+            this.depthBinningComputeShader = Resources.Load<ComputeShader>("LightDepthBinning");
         }
 
         public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
@@ -33,8 +35,18 @@ namespace CustomRenderPipeline
             var tileCount = tileCountX * tileCountY;
 
             var lightIndexCount = DivRoundUp(pointLightData.lightCount, 32);
-            var visibleLightBits = renderGraph.GetBuffer(lightIndexCount * tileCount);
+            var lightDepthRanges = renderGraph.GetTexture(new(settings.DepthSlices, 1), GraphicsFormat.R16G16_UInt);
 
+            using (var pass = renderGraph.AddComputeRenderPass("Light Depth Binning"))
+            {
+                pass.Initialize(depthBinningComputeShader, 0, settings.DepthSlices, 1, 1, false);
+                pass.ReadResource<PointLightData>();
+
+                pass.WriteTexture("Result", lightDepthRanges);
+                pass.ReadResource<ViewData>();
+            }
+
+            var visibleLightBits = renderGraph.GetBuffer(lightIndexCount * tileCount);
             using (var pass = renderGraph.AddComputeRenderPass("Light Culling"))
             {
                 pass.Initialize(computeShader, 0, tileCountX, tileCountY, viewPassData.viewCount, false);
@@ -44,21 +56,24 @@ namespace CustomRenderPipeline
                 pass.ReadResource<ViewData>();
             }
 
-            renderGraph.SetResource(new Result(visibleLightBits));
+            renderGraph.SetResource(new Result(visibleLightBits, lightDepthRanges));
         }
 
         public readonly struct Result : IRenderPassData
         {
             private readonly ResourceHandle<GraphicsBuffer> visibleLightBits;
+            private readonly ResourceHandle<RenderTexture> lightDepthRanges;
 
-            public Result(ResourceHandle<GraphicsBuffer> visibleLightBits)
+            public Result(ResourceHandle<GraphicsBuffer> visibleLightBits, ResourceHandle<RenderTexture> lightDepthRanges)
             {
                 this.visibleLightBits = visibleLightBits;
+                this.lightDepthRanges = lightDepthRanges;
             }
 
             public void SetInputs(RenderPass pass)
             {
                 pass.ReadBuffer("VisibleLightBits", visibleLightBits);
+                pass.ReadTexture("LightDepthRanges", lightDepthRanges);
             }
 
             public void SetProperties(RenderPass pass, CommandBuffer command)

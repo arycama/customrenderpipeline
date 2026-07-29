@@ -15,11 +15,10 @@ namespace CustomRenderPipeline
         private readonly LightingSettings settings;
         private readonly NativeList<LightShadowCasterCullingInfo> perLightInfos = new(1, Allocator.Persistent);
         private readonly NativeList<ShadowSplitData> splitBuffer = new(1, Allocator.Persistent);
-        private readonly LightCulling.Settings lightCullingSettings;
+        private readonly LightCulling.Settings lightCulling;
 
         private LightData[] pointLights = new LightData[8];
         private float[] pointLightDepths = new float[8];
-        private int[] lightDepthBins, lightDepthMinMax;
 
         public LightingSetup(RenderGraph renderGraph, LightingSettings settings, LightCulling.Settings lightCullingSettings) : base(renderGraph)
         {
@@ -323,81 +322,35 @@ namespace CustomRenderPipeline
             // Sort lights by view depth
             Array.Sort(pointLightDepths, pointLights);
 
-            // Resize Z bins if needed and clear
-            Array.Resize(ref lightDepthBins, lightCullingSettings.DepthSlices);
-            Array.Clear(lightDepthBins, 0, lightDepthBins.Length);
-
-            Array.Resize(ref lightDepthMinMax, lightCullingSettings.DepthSlices);
-            for (var i = 0; i < lightDepthMinMax.Length; i++)
-                lightDepthMinMax[i] = BitPack(ushort.MaxValue, 16, 0) | BitPack(0, 16, 16);
-
-            var numSlices = lightCullingSettings.DepthSlices;
-            var linearToLogScale = numSlices / Log2(viewPassData.far / viewPassData.near);
-            var linearToLogOffset = -Log2(viewPassData.near) * linearToLogScale;
-
-            // Add sorted lights to list
-            var binWidth = viewPassData.far / lightCullingSettings.DepthSlices;
-            for (var i = 0; i < pointLightCount; i++)
-            {
-                var light = pointLights[i];
-
-                // Calculate view min and max depth
-                var minZ = light.cullingSphere.z - light.cullingSphere.w;
-                var maxZ = light.cullingSphere.z + light.cullingSphere.w;
-
-                var minBin = Max(0, (int)(minZ / binWidth));
-                var maxBin = Min(lightCullingSettings.DepthSlices - 1, (int)(maxZ / binWidth));
-
-                for (var j = minBin; j <= maxBin; j++)
-                {
-                    lightDepthBins[j] |= i;
-
-                    var currentMinMax = lightDepthMinMax[j];
-
-                    var currentMin = BitUnpack(currentMinMax, 16, 0);
-                    var currentMax = BitUnpack(currentMinMax, 16, 16);
-
-                    currentMin = Min(currentMin, i);
-                    currentMax = Max(currentMax, i);
-
-                    lightDepthMinMax[j] = BitPack(currentMin, 16, 0) | BitPack(currentMax, 16, 16);
-                }
-            }
-
+            var binWidth = viewPassData.far / lightCulling.DepthSlices;
             var pointLightBuffer = pointLightCount == 0 ? renderGraph.EmptyBuffer : renderGraph.GetBuffer(pointLightCount, UnsafeUtility.SizeOf<LightData>());
-            var lightDepthBinBuffer = renderGraph.GetBuffer(lightCullingSettings.DepthSlices);
-            var lightDepthMinMaxBuffer = renderGraph.GetBuffer(lightCullingSettings.DepthSlices);
 
-            using (var pass = renderGraph.AddGenericRenderPass("Set Light Data", (pointLights, pointLightCount, pointLightBuffer, lightDepthBinBuffer, lightDepthBins, lightDepthMinMaxBuffer, lightDepthMinMax)))
+            using (var pass = renderGraph.AddGenericRenderPass("Set Light Data", (pointLights, pointLightCount, pointLightBuffer)))
             {
                 pass.WriteBuffer("", pointLightBuffer);
-                pass.WriteBuffer("", lightDepthBinBuffer);
-                pass.WriteBuffer("", lightDepthMinMaxBuffer);
                 pass.SetRenderFunction(static (command, pass, data) =>
                 {
                     command.SetBufferData(pass.GetBuffer(data.pointLightBuffer), data.pointLights, 0, 0, data.pointLightCount);
-                    command.SetBufferData(pass.GetBuffer(data.lightDepthBinBuffer), data.lightDepthBins);
-                    command.SetBufferData(pass.GetBuffer(data.lightDepthMinMaxBuffer), data.lightDepthMinMax);
                 });
             }
 
-            var tileCountX = DivRoundUp(viewPassData.viewSize.x, lightCullingSettings.TileSize);
-            var tileCountY = DivRoundUp(viewPassData.viewSize.y, lightCullingSettings.TileSize);
+            var tileCountX = DivRoundUp(viewPassData.viewSize.x, lightCulling.TileSize);
+            var tileCountY = DivRoundUp(viewPassData.viewSize.y, lightCulling.TileSize);
             var lightIndexCount = DivRoundUp(pointLightCount, 32);
 
             var pointLightData = renderGraph.SetConstantBuffer
             ((
-                (float)lightCullingSettings.TileSize,
+                (float)lightCulling.TileSize,
                 pointLightCount,
-                DivRoundUp(viewPassData.viewSize.x, lightCullingSettings.TileSize),
+                DivRoundUp(viewPassData.viewSize.x, lightCulling.TileSize),
                 lightIndexCount,
-                lightCullingSettings.DepthSlices,
+                lightCulling.DepthSlices,
                 binWidth,
-                linearToLogScale,
-                linearToLogOffset
+                Rcp(lightCulling.TileSize),
+                Rcp(binWidth)
             ));
 
-            renderGraph.SetResource(new PointLightData(pointLightData, pointLightBuffer, pointLightCount, lightDepthBinBuffer, lightDepthMinMaxBuffer));
+            renderGraph.SetResource(new PointLightData(pointLightData, pointLightBuffer, pointLightCount));
             renderGraph.SetResource(new ShadowRequestsData(directionalShadowRequests, pointShadowRequests, spotShadowRequests));
         }
 
