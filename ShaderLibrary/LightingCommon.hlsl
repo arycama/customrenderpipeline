@@ -191,9 +191,9 @@ float4 cubic(float v)
 	return o;
 }
 
-uint3 GetClusterIndex(float3 screenPosition)
+float3 GetClusterIndex(float3 screenPosition)
 {
-	return float3(screenPosition.xy / TileSize, screenPosition.z / LightBinWidth);
+	return floor(float3(screenPosition.xy / TileSize, screenPosition.z / LightBinWidth));
 }
 
 #endif

@@ -359,21 +359,21 @@ float3 IntersectRayPlaneZ(float3 rayOrigin, float3 rayDirection, float planeDist
 	return rayDirection * t + rayOrigin;
 }
 
-float3x3 LocalToTangentMatrix(float3 normal, float3 tangent, float bitangentSign = 1.0)
+half3x3 LocalToTangentMatrix(half3 normal, half3 tangent, half bitangentSign = 1.0h)
 {
-	float3 bitangent = cross(normal, tangent) * bitangentSign;
-	return float3x3(tangent, bitangent, normal);
+	half3 bitangent = cross(normal, tangent) * bitangentSign;
+	return half3x3(tangent, bitangent, normal);
 }
 
-float3x3 TangentToLocalMatrix(float3 normal, float3 tangent, float bitangentSign = 1.0)
+half3x3 TangentToLocalMatrix(half3 normal, half3 tangent, half bitangentSign = 1.0h)
 {
 	return transpose(LocalToTangentMatrix(normal, tangent, bitangentSign));
 }
 
-float3 TangentToLocalNormal(float3 tangentNormal, float3 normal, float3 tangent, float bitangentSign, bool doNormalize = true)
+half3 TangentToLocalNormal(half3 tangentNormal, half3 normal, half3 tangent, half bitangentSign, bool doNormalize = true)
 {
-	float3x3 tangentToWorld = TangentToLocalMatrix(normal, tangent, bitangentSign);
-	float3 result = mul(tangentToWorld, tangentNormal);
+	half3x3 tangentToWorld = TangentToLocalMatrix(normal, tangent, bitangentSign);
+	half3 result = mul(tangentToWorld, tangentNormal);
 	return doNormalize ? normalize(result) : result;
 }
 
