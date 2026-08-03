@@ -242,7 +242,7 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 	
 	// Flat bit array iterator scalarized on entity with Z-Bin masked words
 	float3 cluster = GetClusterIndex(float3(pixelCoordinate + 0.5, input.viewDepth));
-	uint2 lightRange = LightDepthRanges[uint2(cluster.z, 0)];
+	uint2 lightRange = BitUnpack(LightDepthMinMax[cluster.z], 16, uint2(0, 16));
 	uint2 mergedRange = uint2(WaveActiveMin(lightRange.x), WaveActiveMax(lightRange.y)) >> 5u;
 	
 	// Read range of words of visibility bits

@@ -54,6 +54,7 @@ cbuffer PointLightData
 };
 
 StructuredBuffer<Light> PointLights;
+StructuredBuffer<uint> LightDepthMinMax;
 Texture2D<min16uint2> LightDepthRanges;
 Texture2DArray<uint> VisibleLightBits;
 

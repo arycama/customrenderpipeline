@@ -2,6 +2,7 @@
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Pool;
 using UnityEngine.Rendering;
 using Unmath;
@@ -19,6 +20,7 @@ namespace CustomRenderPipeline
 
         private LightData[] pointLights = new LightData[8];
         private float[] pointLightDepths = new float[8];
+        private int[] lightDepthMinMax;
 
         public LightingSetup(RenderGraph renderGraph, LightingSettings settings, LightCulling.Settings lightCullingSettings) : base(renderGraph)
         {
@@ -325,22 +327,65 @@ namespace CustomRenderPipeline
 
             // Sort lights by view depth
             Array.Sort(pointLightDepths, pointLights);
+            Array.Resize(ref lightDepthMinMax, lightCulling.DepthSlices);
+            for (var i = 0; i < lightDepthMinMax.Length; i++)
+                lightDepthMinMax[i] = BitPack(ushort.MaxValue, 16, 0) | BitPack(0, 16, 16);
 
+            var numSlices = lightCulling.DepthSlices;
+            var linearToLogScale = numSlices / Log2(viewPassData.far / viewPassData.near);
+            var linearToLogOffset = -Log2(viewPassData.near) * linearToLogScale;
+
+            // Add sorted lights to list
             var binWidth = viewPassData.far / lightCulling.DepthSlices;
-            var pointLightBuffer = pointLightCount == 0 ? renderGraph.EmptyBuffer : renderGraph.GetBuffer(pointLightCount, UnsafeUtility.SizeOf<LightData>());
-
-            using (var pass = renderGraph.AddGenericRenderPass("Set Light Data", (pointLights, pointLightCount, pointLightBuffer)))
+            for (var i = 0; i < pointLightCount; i++)
             {
-                pass.WriteBuffer("", pointLightBuffer);
-                pass.SetRenderFunction(static (command, pass, data) =>
+                var light = pointLights[i];
+
+                // Calculate view min and max depth
+                var minZ = light.cullingSphere.z - light.cullingSphere.w;
+                var maxZ = light.cullingSphere.z + light.cullingSphere.w;
+
+                var minBin = Max(0, (int)(minZ / binWidth));
+                var maxBin = Min(lightCulling.DepthSlices - 1, (int)(maxZ / binWidth));
+
+                for (var j = minBin; j <= maxBin; j++)
                 {
-                    command.SetBufferData(pass.GetBuffer(data.pointLightBuffer), data.pointLights, 0, 0, data.pointLightCount);
-                });
+                    var currentMinMax = lightDepthMinMax[j];
+
+                    var currentMin = BitUnpack(currentMinMax, 16, 0);
+                    var currentMax = BitUnpack(currentMinMax, 16, 16);
+
+                    currentMin = Min(currentMin, i);
+                    currentMax = Max(currentMax, i);
+
+                    lightDepthMinMax[j] = BitPack(currentMin, 16, 0) | BitPack(currentMax, 16, 16);
+                }
             }
 
             var tileCountX = DivRoundUp(viewPassData.viewSize.x, lightCulling.TileSize);
             var tileCountY = DivRoundUp(viewPassData.viewSize.y, lightCulling.TileSize);
             var lightIndexCount = DivRoundUp(pointLightCount, 32);
+
+            var pointLightBuffer = pointLightCount == 0 ? renderGraph.EmptyBuffer : renderGraph.GetBuffer(pointLightCount, UnsafeUtility.SizeOf<LightData>());
+            var lightDepthMinMaxBuffer = renderGraph.GetBuffer(lightCulling.DepthSlices);
+            var visibleLightBits = renderGraph.GetTexture(new(tileCountX, tileCountY), GraphicsFormat.R32_UInt, lightIndexCount, TextureDimension.Tex2DArray, isRandomWrite: true);
+
+            using (var pass = renderGraph.AddGenericRenderPass("Set Light Data", (pointLights, pointLightCount, pointLightBuffer, lightDepthMinMaxBuffer, lightDepthMinMax, visibleLightBits)))
+            {
+                pass.WriteBuffer("", pointLightBuffer);
+                pass.WriteBuffer("", lightDepthMinMaxBuffer);
+                pass.WriteTexture(visibleLightBits);
+
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    command.SetBufferData(pass.GetBuffer(data.pointLightBuffer), data.pointLights, 0, 0, data.pointLightCount);
+                    command.SetBufferData(pass.GetBuffer(data.lightDepthMinMaxBuffer), data.lightDepthMinMax);
+
+                    // Clear the light bitmask texture
+                    command.SetRenderTarget(pass.GetRenderTexture(data.visibleLightBits), 0, CubemapFace.Unknown, -1);
+                    command.ClearRenderTarget(false, true, default);
+                });
+            }
 
             var pointLightData = renderGraph.SetConstantBuffer
             ((
@@ -354,7 +399,7 @@ namespace CustomRenderPipeline
                 Rcp(binWidth)
             ));
 
-            renderGraph.SetResource(new PointLightData(pointLightData, pointLightBuffer, pointLightCount));
+            renderGraph.SetResource(new PointLightData(pointLightData, pointLightBuffer, pointLightCount, lightDepthMinMaxBuffer, visibleLightBits));
             renderGraph.SetResource(new ShadowRequestsData(directionalShadowRequests, pointShadowRequests, spotShadowRequests));
         }
 
