@@ -45,14 +45,18 @@ namespace CustomRenderPipeline
                 pass.ReadResource<ViewData>();
             }
 
-            var visibleLightBits = renderGraph.GetTexture(new(tileCountX, tileCountY), GraphicsFormat.R32_UInt, lightIndexCount, TextureDimension.Tex2DArray);
-            using (var pass = renderGraph.AddComputeRenderPass("Light Culling"))
+            var visibleLightBits = renderGraph.GetTexture(new(tileCountX, tileCountY), GraphicsFormat.R32_UInt, lightIndexCount, TextureDimension.Tex2DArray, isRandomWrite: true);
+            using (var pass = renderGraph.AddGenericRenderPass("Light Culling"))
             {
-                pass.Initialize(computeShader, 0, tileCountX, tileCountY, viewPassData.viewCount, false);
+                //pass.Initialize(computeShader, 0, tileCountX, tileCountY, viewPassData.viewCount, false);
                 pass.ReadResource<PointLightData>();
 
-                pass.WriteTexture("VisibleLightBitsWrite", visibleLightBits);
-                pass.ReadResource<ViewData>();
+                pass.WriteTexture(visibleLightBits);
+                pass.SetRenderFunction((command, pass) =>
+                {
+                    command.SetRenderTarget(pass.GetRenderTexture(visibleLightBits), 0, CubemapFace.Unknown, -1);
+                    command.ClearRenderTarget(false, true, default);
+                });
             }
 
             renderGraph.SetResource(new Result(lightDepthRanges, visibleLightBits));
@@ -60,8 +64,8 @@ namespace CustomRenderPipeline
 
         public readonly struct Result : IRenderPassData
         {
-            private readonly ResourceHandle<RenderTexture> lightDepthRanges;
-            private readonly ResourceHandle<RenderTexture> visibleLightBits;
+            public readonly ResourceHandle<RenderTexture> lightDepthRanges;
+            public readonly ResourceHandle<RenderTexture> visibleLightBits;
 
             public Result(ResourceHandle<RenderTexture> lightDepthRanges, ResourceHandle<RenderTexture> visibleLightBits)
             {

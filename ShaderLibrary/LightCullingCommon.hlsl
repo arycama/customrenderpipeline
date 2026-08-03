@@ -72,35 +72,33 @@ void LightCulling(uint3 id, uint2 groupId)
 		
 			// Check if culled by near plane
 			float near = GetNearPlane();
-			if (light.cullingSphere.z + light.cullingSphere.w > near)
-			{
-				// TODO: Do this once per light either in a seperate compute shader or on CPU
-				float3 left, right, down, up;
-				ViewSphereBounds(float3(1, 0, 0), light.cullingSphere.xyz, light.cullingSphere.w, near, left, right);
-				ViewSphereBounds(float3(0, 1, 0), light.cullingSphere.xyz, light.cullingSphere.w, near, down, up);
-		
-				// TODO: Stereo
-				matrix viewToClip = GetViewToClip(id.z);
-				
-				float4 lightBounds;
-				lightBounds.x = MultiplyPointProj(viewToClip, left).x;
-				lightBounds.y = MultiplyPointProj(viewToClip, down).y;
-				lightBounds.z = MultiplyPointProj(viewToClip, right).x;
-				lightBounds.w = MultiplyPointProj(viewToClip, up).y;
-				
-				// TODO: Handle this better
-				if (viewToClip._m11 < 0.0)
-				{
-					if (all(lightBounds.xw < tileBounds.zy && lightBounds.zy > tileBounds.xw))
-						isVisible = true;
-				}
-				else
-				{
-					lightBounds.yw = -lightBounds.yw;
 			
-					if (all(lightBounds.xw < tileBounds.zw && lightBounds.zy > tileBounds.xy))
-						isVisible = true;
-				}
+			// TODO: Do this once per light either in a seperate compute shader or on CPU
+			float3 left, right, down, up;
+			ViewSphereBounds(float3(1, 0, 0), light.cullingSphere.xyz, light.cullingSphere.w, near, left, right);
+			ViewSphereBounds(float3(0, 1, 0), light.cullingSphere.xyz, light.cullingSphere.w, near, down, up);
+		
+			// TODO: Stereo
+			matrix viewToClip = GetViewToClip(id.z);
+				
+			float4 lightBounds;
+			lightBounds.x = MultiplyPointProj(viewToClip, left).x;
+			lightBounds.y = MultiplyPointProj(viewToClip, down).y;
+			lightBounds.z = MultiplyPointProj(viewToClip, right).x;
+			lightBounds.w = MultiplyPointProj(viewToClip, up).y;
+			
+			// TODO: Handle this better
+			if (viewToClip._m11 < 0.0)
+			{
+				if (all(lightBounds.xw < tileBounds.zy && lightBounds.zy > tileBounds.xw))
+					isVisible = true;
+			}
+			else
+			{
+				lightBounds.yw = -lightBounds.yw;
+			
+				if (all(lightBounds.xw < tileBounds.zw && lightBounds.zy > tileBounds.xy))
+					isVisible = true;
 			}
 		}
 			

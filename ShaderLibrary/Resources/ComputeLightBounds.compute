@@ -1,0 +1,71 @@
+#pragma kernel CSMain
+
+#include "../LightingCommon.hlsl"
+#include "../Math.hlsl"
+#include "../MatrixUtils.hlsl"
+
+RWTexture2D<float4> Result;
+
+float Near;
+matrix ViewToClip[2];
+
+// Ref https://jcgt.org/published/0002/02/05/paper.pdf
+// TODO: This can still be simplified/optimised further
+void ViewSphereBounds(float3 axis, float3 center, float radius, float nearZ, out float3 L, out float3 U)
+{
+    // given in coordinates (a,z), where a is in the direction of the vector a, and z is in the standard z direction
+	float2 c = float2(dot(axis, center), center.z);
+
+	// 3.1 Solve for U and L
+	float cSquared = dot(c, c);
+	float tSquared = cSquared - Sq(radius);
+	float t = sqrt(tSquared);
+	float2 sinCosTheta = float2(radius, t) * rsqrt(cSquared);
+	float2x2 rotate = float2x2(sinCosTheta.yx, -sinCosTheta.x, sinCosTheta.y);
+	float k = sqrt(Sq(radius) - Sq(nearZ - c.y));
+	
+	// (cos, sin) of angle theta between c and a tangent vector
+	bool cameraInsideSphere = tSquared <= 0.0;
+	if (!cameraInsideSphere)
+	{
+		U = mul(rotate, c).xxy * sinCosTheta.y;
+		L = mul(c, rotate).xxy * sinCosTheta.y;
+	}
+	
+	// Does the near plane intersect the sphere?
+	if (c.y + radius > nearZ)
+	{
+		// Square root of the discriminant. NaN (and unused) if the camera is in the sphere
+		if (cameraInsideSphere || U.z < nearZ)
+			U = float2(c.x + k, nearZ).xxy;
+		
+		if (cameraInsideSphere || L.z < nearZ)
+			L = float2(c.x - k, nearZ).xxy;
+	}
+	
+	// Transform back to camera space
+	float maxZ = max(nearZ, c.y - radius);
+	U = float3(U.xy * axis.xy / U.z, 1.0) * maxZ;
+	L = float3(L.xy * axis.xy / L.z, 1.0) * maxZ;
+}
+
+[numthreads(32, 1, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+	Light light = PointLights[id.x];
+		
+	// Check if culled by near plane
+	// TODO: Do this once per light either in a seperate compute shader or on CPU
+	float3 left, right, down, up;
+	ViewSphereBounds(float3(1, 0, 0), light.cullingSphere.xyz, light.cullingSphere.w, Near, left, right);
+	ViewSphereBounds(float3(0, 1, 0), light.cullingSphere.xyz, light.cullingSphere.w, Near, down, up);
+		
+	// TODO: Stereo
+	matrix viewToClip = ViewToClip[id.y];
+	
+	float4 lightBounds;
+	lightBounds.x = MultiplyPointProj(viewToClip, left).x;
+	lightBounds.y = MultiplyPointProj(viewToClip, down).y;
+	lightBounds.z = MultiplyPointProj(viewToClip, right).x;
+	lightBounds.w = MultiplyPointProj(viewToClip, up).y;
+}

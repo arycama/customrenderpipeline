@@ -14,6 +14,7 @@ namespace CustomRenderPipeline
         public static BlitToScreenPass<T> AddBlitToScreenPass<T>(this RenderGraph renderGraph, string name, T data) => renderGraph.AddRenderPass<BlitToScreenPass<T>, T>(name, data);
         public static ComputeRenderPass<T> AddComputeRenderPass<T>(this RenderGraph renderGraph, string name, T data) => renderGraph.AddRenderPass<ComputeRenderPass<T>, T>(name, data);
         public static DrawInstancedIndirectRenderPass<T> AddDrawInstancedIndirectRenderPass<T>(this RenderGraph renderGraph, string name, T data) => renderGraph.AddRenderPass<DrawInstancedIndirectRenderPass<T>, T>(name, data);
+        public static DrawInstancedProceduralRenderPass<T> AddDrawInstancedProceduralRenderPass<T>(this RenderGraph renderGraph, string name, T data) => renderGraph.AddRenderPass<DrawInstancedProceduralRenderPass<T>, T>(name, data);
         public static DrawProceduralIndexedRenderPass<T> AddDrawProceduralIndexedRenderPass<T>(this RenderGraph renderGraph, string name, T data) => renderGraph.AddRenderPass<DrawProceduralIndexedRenderPass<T>, T>(name, data);
         public static DrawProceduralIndirectIndexedRenderPass<T> AddDrawProceduralIndirectIndexedRenderPass<T>(this RenderGraph renderGraph, string name, T data) => renderGraph.AddRenderPass<DrawProceduralIndirectIndexedRenderPass<T>, T>(name, data);
         public static DrawProceduralIndirectRenderPass<T> AddDrawProceduralIndirectRenderPass<T>(this RenderGraph renderGraph, string name, T data) => renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass<T>, T>(name, data);
@@ -30,6 +31,7 @@ namespace CustomRenderPipeline
         public static BlitToScreenPass<int> AddBlitToScreenPass(this RenderGraph renderGraph, string name) => AddBlitToScreenPass(renderGraph, name, 0);
         public static ComputeRenderPass<int> AddComputeRenderPass(this RenderGraph renderGraph, string name) => AddComputeRenderPass(renderGraph, name, 0);
         public static DrawInstancedIndirectRenderPass<int> AddDrawInstancedIndirectRenderPass(this RenderGraph renderGraph, string name) => AddDrawInstancedIndirectRenderPass(renderGraph, name, 0);
+        public static DrawInstancedProceduralRenderPass<int> AddDrawInstancedProceduralRenderPass(this RenderGraph renderGraph, string name) => AddDrawInstancedProceduralRenderPass(renderGraph, name, 0);
         public static DrawProceduralIndexedRenderPass<int> AddDrawProceduralIndexedRenderPass(this RenderGraph renderGraph, string name) => AddDrawProceduralIndexedRenderPass(renderGraph, name, 0);
         public static DrawProceduralIndirectIndexedRenderPass<int> AddDrawProceduralIndirectIndexedRenderPass(this RenderGraph renderGraph, string name) => AddDrawProceduralIndirectIndexedRenderPass(renderGraph, name, 0);
         public static DrawProceduralIndirectRenderPass<int> AddDrawProceduralIndirectRenderPass(this RenderGraph renderGraph, string name) => AddDrawProceduralIndirectRenderPass(renderGraph, name, 0);

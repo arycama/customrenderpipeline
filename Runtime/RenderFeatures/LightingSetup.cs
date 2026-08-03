@@ -237,6 +237,10 @@ namespace CustomRenderPipeline
                     // Convert to view space
                     cullingSphere.xyz = viewPassData.rotation.InverseRotate(cullingSphere.xyz - viewPassData.position);
 
+                    // Reject lights that are fully behind the near plane since Unity doesn't do it automatically..
+                    if (cullingSphere.z + cullingSphere.w <= viewPassData.near)
+                        continue;
+
                     var lightData = new LightData
                     (
                         lightToWorld.Translation - viewPassData.position,
