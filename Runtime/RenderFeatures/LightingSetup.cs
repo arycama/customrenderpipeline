@@ -262,7 +262,7 @@ namespace CustomRenderPipeline
                     );
 
                     pointLights[pointLightCount] = lightData;
-                    pointLightDepths[pointLightCount] = cullingSphere.z;
+                    pointLightDepths[pointLightCount] = cullingSphere.z - cullingSphere.w * 1.075f;
                     pointLightCount++;
                 }
             }
@@ -337,6 +337,8 @@ namespace CustomRenderPipeline
 
             // Add sorted lights to list
             var binWidth = viewPassData.far / lightCulling.DepthSlices;
+		    var intersectingLightCount = 0;
+
             for (var i = 0; i < pointLightCount; i++)
             {
                 var light = pointLights[i];
@@ -360,6 +362,10 @@ namespace CustomRenderPipeline
 
                     lightDepthMinMax[j] = BitPack(currentMin, 16, 0) | BitPack(currentMax, 16, 16);
                 }
+
+                // Check if the light intersects the near plane
+                if (pointLightDepths[i] < viewPassData.near)
+                    intersectingLightCount = i + 1;
             }
 
             var tileCountX = DivRoundUp(viewPassData.viewSize.x, lightCulling.TileSize);
@@ -399,7 +405,7 @@ namespace CustomRenderPipeline
                 Rcp(binWidth)
             ));
 
-            renderGraph.SetResource(new PointLightData(pointLightData, pointLightBuffer, pointLightCount, lightDepthMinMaxBuffer, visibleLightBits));
+            renderGraph.SetResource(new PointLightData(pointLightData, pointLightBuffer, pointLightCount, lightDepthMinMaxBuffer, visibleLightBits, intersectingLightCount));
             renderGraph.SetResource(new ShadowRequestsData(directionalShadowRequests, pointShadowRequests, spotShadowRequests));
         }
 

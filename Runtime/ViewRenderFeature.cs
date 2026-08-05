@@ -8,6 +8,6 @@ namespace CustomRenderPipeline
     {
         public ViewRenderFeature(RenderGraph renderGraph) : base(renderGraph) { }
 
-        public abstract void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData displayRenderPass, in DisplayData displayOutputData, ScriptableRenderContext context);
+        public abstract void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context);
     }
 }

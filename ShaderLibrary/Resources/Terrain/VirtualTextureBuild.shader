@@ -9,6 +9,7 @@ Shader "Hidden/Virtual Texture Build"
             #pragma vertex VertexFullscreenTriangleVolume
             #pragma fragment Fragment
             #pragma use_dxc
+            #pragma require WaveMath
             #include "VirtualTextureBuild.hlsl"
             ENDHLSL
         }

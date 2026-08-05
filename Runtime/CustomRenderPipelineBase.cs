@@ -302,6 +302,7 @@ namespace CustomRenderPipeline
                 ReadOnlySpan<ViewParameter> displayViewParameters = viewParameters.AsSpan(displayRenderPass.parameterStart, displayRenderPass.viewCount);
 
                 using var renderCameraScope = renderGraph.AddProfileScope(profileMarker);
+                BeginCameraRendering(context, displayRenderPass.camera);
                 foreach (var cameraRenderFeature in perCameraRenderFeatures)
                     cameraRenderFeature.Render(in displayViewParameters, in displayRenderPass, in displayOutputDatas[displayRenderPass.displayInfoIndex], context);
 
