@@ -65,8 +65,8 @@ namespace CustomRenderPipeline
             {
                 var visibleLight = cullingResults.visibleLights[i];
                 var lightToWorld = (Float4x4)visibleLight.localToWorldMatrix;
-				var lightColor = ColorspaceUtility.Rec709ToRec2020(visibleLight.finalColor.Float3());
-				var lightForward = lightToWorld.Forward;
+                var lightColor = ColorspaceUtility.Rec709ToRec2020(visibleLight.finalColor.Float3());
+                var lightForward = lightToWorld.Forward;
                 var lightPosition = lightToWorld.Translation;
                 var lightRotation = lightToWorld.Rotation;
                 var splitRange = new RangeInt(0, 0);
@@ -337,7 +337,7 @@ namespace CustomRenderPipeline
 
             // Add sorted lights to list
             var binWidth = viewPassData.far / lightCulling.DepthSlices;
-		    var intersectingLightCount = 0;
+            var intersectingLightCount = 0;
 
             for (var i = 0; i < pointLightCount; i++)
             {
@@ -396,8 +396,8 @@ namespace CustomRenderPipeline
             var pointLightData = renderGraph.SetConstantBuffer
             ((
                 (float)lightCulling.TileSize,
-                pointLightCount,
-                DivRoundUp(viewPassData.viewSize.x, lightCulling.TileSize),
+                tileCountX * tileCountY,
+                tileCountX,
                 lightIndexCount,
                 lightCulling.DepthSlices,
                 binWidth,

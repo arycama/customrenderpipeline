@@ -176,7 +176,7 @@ namespace CustomRenderPipeline
                         var inputCount = currentPass.frameBufferInputs.Count;
                         var outputCount = currentPass.OutputsToCameraTarget ? 1 : currentPass.colorTargets.Count;
 
-                        var canMergeSubPass = subPasses.Length < 8 && currentPass.flags == flags && inputCount == inputs.Length && outputCount == outputs.Length;
+                        var canMergeSubPass = !currentPass.ForceNewSubPass && subPasses.Length < 8 && currentPass.flags == flags && inputCount == inputs.Length && outputCount == outputs.Length;
                         if (canMergeSubPass)
                         {
                             // Check if all the inputs and outputs are equal (And in identical order) since this must be true for the pass to merge

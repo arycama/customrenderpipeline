@@ -382,6 +382,11 @@ float3 TangentToLocalNormal(float3 tangentNormal, float3 normal, float4 tangent,
 	return TangentToLocalNormal(tangentNormal, normal, tangent.xyz, tangent.w, doNormalize);
 }
 
+half3 TangentToLocalNormal(half3 tangentNormal, half3 normal, half4 tangent, bool doNormalize = true)
+{
+	return TangentToLocalNormal(tangentNormal, normal, tangent.xyz, tangent.w, doNormalize);
+}
+
 float CosAngle(float3 a, float3 b)
 {
 	return dot(a, b);

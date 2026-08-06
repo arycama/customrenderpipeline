@@ -75,6 +75,7 @@ namespace CustomRenderPipeline
         public virtual bool IsNativeRenderPass => false;
         public virtual bool OutputsToCameraTarget => false;
         public bool PreventNewSubPass { get; set; } = false;
+        public bool ForceNewSubPass { get; set; } = false;
         public RenderTargetIdentifier FrameBufferTarget { get; protected set; }
         public GraphicsFormat FrameBufferFormat { get; protected set; }
         public Int2 Size { get; protected set; }
@@ -116,6 +117,7 @@ namespace CustomRenderPipeline
             colorTargets.Clear();
             depthBuffer = default;
             PreventNewSubPass = false;
+            ForceNewSubPass = false;
         }
 
         void IDisposable.Dispose() { }

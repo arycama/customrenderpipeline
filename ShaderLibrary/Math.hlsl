@@ -1,10 +1,10 @@
 #ifndef MATH_INCLUDED
 #define MATH_INCLUDED
 
-const static float HalfEps = 4.8828125e-4;
-const static float HalfMin = 6.103515625e-5; // 2^-14, the same value for 10, 11 and 16-bit: https://www.khronos.org/opengl/wiki/Small_Float_Formats
-const static float HalfMinSqrt = 0.0078125; // 2^-7 == sqrt(HALF_MIN), useful for ensuring HALF_MIN after x^2
-const static float HalfMax = 65504.0;
+const static half HalfEps = 4.8828125e-4h;
+const static half HalfMin = 6.103515625e-5h; // 2^-14, the same value for 10, 11 and 16-bit: https://www.khronos.org/opengl/wiki/Small_Float_Formats
+const static half HalfMinSqrt = 0.0078125h; // 2^-7 == sqrt(HALF_MIN), useful for ensuring HALF_MIN after x^2
+const static half HalfMax = 65504.0h;
 
 const static float FloatEps = 5.960464478e-8; // 2^-24, machine epsilon: 1 + EPS = 1 (half of the ULP for 1.0f)
 const static float FloatMin = 1.175494351e-38; // Minimum normalized positive floating-point number
@@ -49,36 +49,71 @@ float2 InvLerp(float2 t, float2 x, float2 y) { return (t - x) * rcp(y - x); }
 float3 InvLerp(float3 t, float3 x, float3 y) { return (t - x) * rcp(y - x); }
 float4 InvLerp(float4 t, float4 x, float4 y) { return (t - x) * rcp(y - x); }
 
+half1 InvLerp(half1 t, half1 x, half1 y) { return (t - x) * rcp(y - x); }
+half2 InvLerp(half2 t, half2 x, half2 y) { return (t - x) * rcp(y - x); }
+half3 InvLerp(half3 t, half3 x, half3 y) { return (t - x) * rcp(y - x); }
+half4 InvLerp(half4 t, half4 x, half4 y) { return (t - x) * rcp(y - x); }
+
 // Remaps a value from one range to another
 float1 Remap(float1 v, float1 pMin, float1 pMax = 1.0, float1 nMin = 0.0, float1 nMax = 1.0) { return lerp(nMin, nMax, InvLerp(v, pMin, pMax)); }
 float2 Remap(float2 v, float2 pMin, float2 pMax = 1.0, float2 nMin = 0.0, float2 nMax = 1.0) { return lerp(nMin, nMax, InvLerp(v, pMin, pMax)); }
 float3 Remap(float3 v, float3 pMin, float3 pMax = 1.0, float3 nMin = 0.0, float3 nMax = 1.0) { return lerp(nMin, nMax, InvLerp(v, pMin, pMax)); }
 float4 Remap(float4 v, float4 pMin, float4 pMax = 1.0, float4 nMin = 0.0, float4 nMax = 1.0) { return lerp(nMin, nMax, InvLerp(v, pMin, pMax)); }
 
+half1 Remap(half1 v, half1 pMin, half1 pMax = 1.0, half1 nMin = 0.0, half1 nMax = 1.0) { return lerp(nMin, nMax, InvLerp(v, pMin, pMax)); }
+half2 Remap(half2 v, half2 pMin, half2 pMax = 1.0, half2 nMin = 0.0, half2 nMax = 1.0) { return lerp(nMin, nMax, InvLerp(v, pMin, pMax)); }
+half3 Remap(half3 v, half3 pMin, half3 pMax = 1.0, half3 nMin = 0.0, half3 nMax = 1.0) { return lerp(nMin, nMax, InvLerp(v, pMin, pMax)); }
+half4 Remap(half4 v, half4 pMin, half4 pMax = 1.0, half4 nMin = 0.0, half4 nMax = 1.0) { return lerp(nMin, nMax, InvLerp(v, pMin, pMax)); }
+
 float1 Remap01ToHalfTexel(float1 coord, float1 size) { return Remap(coord, 0.0, 1.0, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size)); }
 float2 Remap01ToHalfTexel(float2 coord, float2 size) { return Remap(coord, 0.0, 1.0, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size)); }
 float3 Remap01ToHalfTexel(float3 coord, float3 size) { return Remap(coord, 0.0, 1.0, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size)); }
 float4 Remap01ToHalfTexel(float4 coord, float4 size) { return Remap(coord, 0.0, 1.0, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size)); }
+
+half1 Remap01ToHalfTexel(half1 coord, half1 size) { return Remap(coord, 0.0h, 1.0h, 0.5h * rcp(size), 1.0h - 0.5h * rcp(size)); }
+half2 Remap01ToHalfTexel(half2 coord, half2 size) { return Remap(coord, 0.0h, 1.0h, 0.5h * rcp(size), 1.0h - 0.5h * rcp(size)); }
+half3 Remap01ToHalfTexel(half3 coord, half3 size) { return Remap(coord, 0.0h, 1.0h, 0.5h * rcp(size), 1.0h - 0.5h * rcp(size)); }
+half4 Remap01ToHalfTexel(half4 coord, half4 size) { return Remap(coord, 0.0h, 1.0h, 0.5h * rcp(size), 1.0h - 0.5h * rcp(size)); }
 
 float1 RemapHalfTexelTo01(float1 coord, float1 size) { return Remap(coord, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size), 0.0, 1.0); }
 float2 RemapHalfTexelTo01(float2 coord, float2 size) { return Remap(coord, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size), 0.0, 1.0); }
 float3 RemapHalfTexelTo01(float3 coord, float3 size) { return Remap(coord, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size), 0.0, 1.0); }
 float4 RemapHalfTexelTo01(float4 coord, float4 size) { return Remap(coord, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size), 0.0, 1.0); }
 
+half1 RemapHalfTexelTo01(half1 coord, half1 size) { return Remap(coord, 0.5h * rcp(size), 1.0h - 0.5h * rcp(size), 0.0h, 1.0h); }
+half2 RemapHalfTexelTo01(half2 coord, half2 size) { return Remap(coord, 0.5h * rcp(size), 1.0h - 0.5h * rcp(size), 0.0h, 1.0h); }
+half3 RemapHalfTexelTo01(half3 coord, half3 size) { return Remap(coord, 0.5h * rcp(size), 1.0h - 0.5h * rcp(size), 0.0h, 1.0h); }
+half4 RemapHalfTexelTo01(half4 coord, half4 size) { return Remap(coord, 0.5h * rcp(size), 1.0h - 0.5h * rcp(size), 0.0h, 1.0h); }
+
 float SqrLength(float1 x) { return dot(x, x); }
 float SqrLength(float2 x) { return dot(x, x); }
 float SqrLength(float3 x) { return dot(x, x); }
 float SqrLength(float4 x) { return dot(x, x); }
+
+half SqrLength(half1 x) { return dot(x, x); }
+half SqrLength(half2 x) { return dot(x, x); }
+half SqrLength(half3 x) { return dot(x, x); }
+half SqrLength(half4 x) { return dot(x, x); }
 
 float RcpLength(float1 x) { return rsqrt(SqrLength(x)); }
 float RcpLength(float2 x) { return rsqrt(SqrLength(x)); }
 float RcpLength(float3 x) { return rsqrt(SqrLength(x)); }
 float RcpLength(float4 x) { return rsqrt(SqrLength(x)); }
 
+half RcpLength(half1 x) { return rsqrt(SqrLength(x)); }
+half RcpLength(half2 x) { return rsqrt(SqrLength(x)); }
+half RcpLength(half3 x) { return rsqrt(SqrLength(x)); }
+half RcpLength(half4 x) { return rsqrt(SqrLength(x)); }
+
 float1 SinFromCos(float1 x) { return sqrt(saturate(1.0 - Sq(x))); }
 float2 SinFromCos(float2 x) { return sqrt(saturate(1.0 - Sq(x))); }
 float3 SinFromCos(float3 x) { return sqrt(saturate(1.0 - Sq(x))); }
 float4 SinFromCos(float4 x) { return sqrt(saturate(1.0 - Sq(x))); }
+
+half1 SinFromCos(half1 x) { return sqrt(saturate(1.0h - Sq(x))); }
+half2 SinFromCos(half2 x) { return sqrt(saturate(1.0h - Sq(x))); }
+half3 SinFromCos(half3 x) { return sqrt(saturate(1.0h - Sq(x))); }
+half4 SinFromCos(half4 x) { return sqrt(saturate(1.0h - Sq(x))); }
 
 float1 FastSqrt(float1 x) { return asfloat(0x1FBD1DF5 + (asint(x) >> 1)); }
 float2 FastSqrt(float2 x) { return asfloat(0x1FBD1DF5 + (asint(x) >> 1)); }
@@ -198,6 +233,11 @@ float3x3 Inverse(float3x3 m)
 float RcpSinFromCos(float x)
 {
 	return rsqrt(saturate(1.0 - Sq(x)));
+}
+
+half RcpSinFromCos(half x)
+{
+	return rsqrt(saturate(1.0h - Sq(x)));
 }
 
 float sec(float x)

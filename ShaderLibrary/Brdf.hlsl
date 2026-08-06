@@ -59,7 +59,7 @@ half GgxDv(half roughness2, half NdotH, half NdotL, half NdotV, half partLambdaV
 	half s2 = Sq((NdotH * roughness2 - NdotH) * NdotH + 1.0h);
 	half lambdaL = NdotV * GetPartLambdaV(roughness2, NdotL);
 	half denom = 2.0h * (NdotL * partLambdaV + lambdaL) * s2;
-	return denom ? roughness2 * rcp(denom) : 0.0h;
+	return roughness2 * rcp(denom);
 }
 
 half3 FresnelFull(half c, half3 iorRatio)
@@ -137,8 +137,8 @@ half3 GgxBsdf(half roughness2, half3 reflectivity, half NdotL, half NdotV, half 
 	bool isThinApprox = !isBackface && NdotV >= 0.0h && NdotL < 0.0h;
 	
 	// If no valid cases, return
-	if(!isBrdf && !isFlippedBrdf && !isThin && !isVolume && !isThinApprox)
-		return 0.0h;
+	//if(!isBrdf && !isFlippedBrdf && !isThin && !isVolume && !isThinApprox)
+	//	return 0.0h;
 	
 	half iorRatio = ReflectivityToIorRatio(reflectivity).r;
 	half rcpIorRatio = ReflectivityToRcpIorRatio(reflectivity).r;
@@ -150,8 +150,8 @@ half3 GgxBsdf(half roughness2, half3 reflectivity, half NdotL, half NdotV, half 
 		LdotV = LdotV + 2.0h * NdotL * NdotV;
 	}
 	
-	if (LdotV <= -1.0h)
-		return 0.0h;
+	//if (LdotV <= -1.0h)
+	//	return 0.0h;
 	
 	half rcpLenLv = rsqrt(LdotV * 2.0h + 2.0h);
 	

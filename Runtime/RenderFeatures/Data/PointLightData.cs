@@ -5,7 +5,7 @@ namespace CustomRenderPipeline
 {
     public readonly struct PointLightData : IRenderPassData
     {
-        private readonly ResourceHandle<GraphicsBuffer> dataBuffer, lightBuffer, lightDepthMinMaxBuffer;
+        public readonly ResourceHandle<GraphicsBuffer> dataBuffer, lightBuffer, lightDepthMinMaxBuffer;
         public readonly ResourceHandle<RenderTexture> visibleLightBits;
         public readonly int lightCount, intersectingLightCount;
 

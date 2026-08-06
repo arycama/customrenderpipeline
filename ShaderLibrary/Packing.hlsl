@@ -86,6 +86,13 @@ float2 NormalToOctahedralUv(float3 n)
 	return 0.5 * (n.xy + select(n.xy >= 0.0, t, -t)) + 0.5;
 }
 
+half2 NormalToOctahedralUv(half3 n)
+{
+	n *= rcp(dot(abs(n), 1.0h));
+	half t = saturate(-n.z);
+	return 0.5h * (n.xy + select(n.xy >= 0.0h, t, -t)) + 0.5h;
+}
+
 float3 OctahedralUvToNormal(float2 uv)
 {
 	float2 f = 2.0 * uv - 1.0;
@@ -117,9 +124,23 @@ float3 UnpackNormalSNorm(float2 packedNormal, float scale = 1.0)
 	return normal;
 }
 
+half3 UnpackNormalSNorm(half2 packedNormal, half scale = 1.0h)
+{
+	half3 normal;
+	normal.xy = packedNormal * scale;
+	normal.z = sqrt(saturate(1.0h - SqrLength(normal.xy)));
+	return normal;
+}
+
 float3 UnpackNormalUNorm(float2 packedNormal, float scale = 1.0)
 {
 	packedNormal.xy = 2.0 * packedNormal - 1.0;
+	return UnpackNormalSNorm(packedNormal, scale);
+}
+
+half3 UnpackNormalUNorm(half2 packedNormal, half scale = 1.0h)
+{
+	packedNormal.xy = 2.0h * packedNormal - 1.0h;
 	return UnpackNormalSNorm(packedNormal, scale);
 }
 

@@ -43,7 +43,7 @@ cbuffer LightingData
 cbuffer PointLightData
 {
 	float TileSize;
-	uint LightCount;
+	uint TileCount;
 	uint TileCountX;
 	uint LightIndexCount;
 	
