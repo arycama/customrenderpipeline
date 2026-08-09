@@ -1,6 +1,5 @@
 using UnityEngine;
 using UnityEngine.Assertions;
-using UnityEngine.Rendering;
 
 namespace CustomRenderPipeline
 {
@@ -11,6 +10,7 @@ namespace CustomRenderPipeline
 
         public void Initialize(ComputeShader computeShader, int kernelIndex = 0, int xThreads = 1, int yThreads = 1, int zThreads = 1, bool normalizedDispatch = true)
         {
+            Assert.IsNotNull(computeShader);
             this.computeShader = computeShader;
             this.kernelIndex = kernelIndex;
             this.xThreads = xThreads;

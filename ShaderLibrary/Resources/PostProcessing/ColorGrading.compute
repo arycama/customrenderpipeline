@@ -1,8 +1,9 @@
 #pragma kernel ColorGrading
+#pragma use_dxc
 
 #include "../../ColorGradingCommon.hlsl"
 
-RWTexture3D<unorm min10float4> Result;
+RWTexture3D<float4> Result;
 
 cbuffer Properties
 {

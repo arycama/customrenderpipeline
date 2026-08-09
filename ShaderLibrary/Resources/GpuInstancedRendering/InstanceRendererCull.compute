@@ -1,6 +1,7 @@
 ﻿ #pragma kernel Visibility
 
 #pragma multi_compile _ HIZ_ON
+#pragma use_dxc
 
 #include "../../Common.hlsl"
 #include "../../TerrainCommon.hlsl"

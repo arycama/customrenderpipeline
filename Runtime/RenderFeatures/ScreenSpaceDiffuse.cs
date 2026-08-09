@@ -48,7 +48,6 @@ namespace CustomRenderPipeline
                 {
                     pass.ReadResource<SkyReflectionAmbientData>();
                     pass.ReadResource<PointLightData>();
-                    pass.ReadResource<LightCulling.Result>();
                     pass.ReadResource<AutoExposureData>();
                     pass.ReadResource<AtmospherePropertiesAndTables>();
                     pass.ReadResource<TerrainFrameData>(true);
@@ -70,7 +69,6 @@ namespace CustomRenderPipeline
                     pass.ReadRtHandle<SceneColor>();
                     pass.ReadResource<SkyReflectionAmbientData>();
                     pass.ReadResource<PointLightData>();
-                    pass.ReadResource<LightCulling.Result>();
                     pass.ReadResource<AutoExposureData>();
                     pass.ReadResource<FrameData>();
                     pass.ReadResource<ViewData>();
@@ -95,7 +93,6 @@ namespace CustomRenderPipeline
                     pass.WriteTexture(hitResult);
 
                     pass.ReadResource<PointLightData>();
-                    pass.ReadResource<LightCulling.Result>();
                     pass.ReadResource<TemporalAAData>();
                     pass.ReadResource<AutoExposureData>();
                     pass.ReadResource<SkyReflectionAmbientData>();

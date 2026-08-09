@@ -1,4 +1,5 @@
 #pragma kernel CSMain
+#pragma use_dxc
 
 #include "TerrainAmbientOcclusion.hlsl"
 

@@ -22,9 +22,10 @@ namespace CustomRenderPipeline
         private float[] pointLightDepths = new float[8];
         private int[] lightDepthMinMax;
 
-        public LightingSetup(RenderGraph renderGraph, LightingSettings settings, LightCulling.Settings lightCullingSettings) : base(renderGraph)
+        public LightingSetup(RenderGraph renderGraph, LightingSettings settings, LightCulling.Settings lightCulling) : base(renderGraph)
         {
             this.settings = settings;
+            this.lightCulling = lightCulling;
         }
 
         protected override void Cleanup(bool disposing)

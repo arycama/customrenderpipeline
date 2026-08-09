@@ -1,6 +1,7 @@
 #pragma kernel MultiScatter KERNEL=MultiScatter MULTI_SCATTER
 #pragma kernel AmbientGroundLookup KERNEL=AmbientGroundLookup AMBIENT_GROUND
 #pragma kernel AmbientSkyLookup KERNEL=AmbientSkyLookup AMBIENT_SKY
+#pragma use_dxc
 
 #include "../../Common.hlsl"
 #include "../../Color.hlsl"

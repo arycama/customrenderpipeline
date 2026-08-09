@@ -71,7 +71,6 @@ namespace CustomRenderPipeline
                 pass.ReadResource<AutoExposureData>();
                 pass.ReadResource<AtmospherePropertiesAndTables>();
                 pass.ReadResource<PointLightData>();
-                pass.ReadResource<LightCulling.Result>();
                 pass.ReadResource<ShadowData>();
                 pass.ReadResource<CloudShadowDataResult>();
                 pass.ReadResource<ViewData>();

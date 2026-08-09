@@ -1,8 +1,7 @@
 using System;
 using UnityEngine;
-using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
-using static Unmath.Math;
+using Unmath;
 
 namespace CustomRenderPipeline
 {
@@ -13,75 +12,47 @@ namespace CustomRenderPipeline
         {
             [field: SerializeField, Pow2(128)] public int TileSize { get; private set; } = 16;
             [field: SerializeField, Pow2(8192)] public int DepthSlices { get; private set; } = 8192;
+            [field: SerializeField] public Mesh PointLightMesh { get; private set; }
         }
 
         private readonly Settings settings;
-        private readonly ComputeShader computeShader, depthBinningComputeShader;
+        private readonly Material pointLightMaterial;
 
-        public LightCulling(Settings settings, RenderGraph renderGraph, ComputeShader computeShader) : base(renderGraph)
+        public LightCulling(Settings settings, RenderGraph renderGraph) : base(renderGraph)
         {
             this.settings = settings;
-            this.computeShader = computeShader;
-            this.depthBinningComputeShader = Resources.Load<ComputeShader>("LightDepthBinning");
+			pointLightMaterial = new Material(Shader.Find("Hidden/Point Light")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
         public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
         {
-            if (!renderGraph.TryGetResource<PointLightData>(out var pointLightData))
+            if (settings.PointLightMesh == null || !renderGraph.TryGetResource<PointLightData>(out var pointLightData))
                 return;
 
-            var tileCountX = DivRoundUp(viewPassData.viewSize.x, settings.TileSize);
-            var tileCountY = DivRoundUp(viewPassData.viewSize.y, settings.TileSize);
-
-            var lightIndexCount = DivRoundUp(pointLightData.lightCount, 32);
-            var lightDepthRanges = renderGraph.GetTexture(new(settings.DepthSlices, 1), GraphicsFormat.R16G16_UInt);
-
-            using (var pass = renderGraph.AddComputeRenderPass("Light Depth Binning"))
+            void RenderPass(int count, int indexOffset, int passIndex, Int2 viewSize, int viewCount)
             {
-                pass.Initialize(depthBinningComputeShader, 0, settings.DepthSlices, 1, 1, false);
-                pass.ReadResource<PointLightData>();
+                using var pass = renderGraph.AddDrawInstancedProceduralRenderPass("Light Culling", (pointLightData, indexOffset));
+                pass.Initialize(settings.PointLightMesh, 0, pointLightMaterial, count, viewSize, viewCount, passIndex: passIndex);
+                pass.WriteRtHandleDepth<CameraDepth>();
 
-                pass.WriteTexture("Result", lightDepthRanges);
                 pass.ReadResource<ViewData>();
-            }
-
-            var visibleLightBits = renderGraph.GetTexture(new(tileCountX, tileCountY), GraphicsFormat.R32_UInt, lightIndexCount, TextureDimension.Tex2DArray, isRandomWrite: true);
-            using (var pass = renderGraph.AddGenericRenderPass("Light Culling"))
-            {
-                //pass.Initialize(computeShader, 0, tileCountX, tileCountY, viewPassData.viewCount, false);
                 pass.ReadResource<PointLightData>();
+                pass.ReadTexture("VisibleLightBitsWrite", pointLightData.visibleLightBits);
 
-                pass.WriteTexture(visibleLightBits);
-                pass.SetRenderFunction((command, pass) =>
+                pass.SetRenderFunction(static (command, pass, data) =>
                 {
-                    command.SetRenderTarget(pass.GetRenderTexture(visibleLightBits), 0, CubemapFace.Unknown, -1);
-                    command.ClearRenderTarget(false, true, default);
+                    command.SetRandomWriteTarget(3, pass.GetRenderTexture(data.pointLightData.visibleLightBits));
+                    pass.SetInt("IndexOffset", data.indexOffset);
                 });
             }
 
-            renderGraph.SetResource(new Result(lightDepthRanges, visibleLightBits));
-        }
+            var intersectingLightCount = pointLightData.intersectingLightCount;
+            if (intersectingLightCount > 0)
+                RenderPass(intersectingLightCount, 0, 0, viewPassData.viewSize, viewPassData.viewCount);
 
-        public readonly struct Result : IRenderPassData
-        {
-            public readonly ResourceHandle<RenderTexture> lightDepthRanges;
-            public readonly ResourceHandle<RenderTexture> visibleLightBits;
-
-            public Result(ResourceHandle<RenderTexture> lightDepthRanges, ResourceHandle<RenderTexture> visibleLightBits)
-            {
-                this.lightDepthRanges = lightDepthRanges;
-                this.visibleLightBits = visibleLightBits;
-            }
-
-            public void SetInputs(RenderPass pass)
-            {
-                pass.ReadTexture("LightDepthRanges", lightDepthRanges);
-                pass.ReadTexture("VisibleLightBits", visibleLightBits);
-            }
-
-            public void SetProperties(RenderPass pass, CommandBuffer command)
-            {
-            }
+            var remainingLightCount = pointLightData.lightCount - intersectingLightCount;
+            if (remainingLightCount > 0)
+                RenderPass(remainingLightCount, intersectingLightCount, 1, viewPassData.viewSize, viewPassData.viewCount);
         }
     }
 }

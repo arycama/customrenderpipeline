@@ -44,7 +44,7 @@ Shader "Surface/Grass"
             #pragma vertex Vertex
             #pragma fragment Fragment
             #pragma shader_feature_local_fragment CUTOUT_ON
-
+		    #pragma use_dxc
             #include "Grass.hlsl"
             ENDHLSL
         }

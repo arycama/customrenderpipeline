@@ -8,6 +8,7 @@
 #pragma kernel ClearBuffer
 #pragma kernel ClearTexture
 #pragma kernel GatherRequestedPages
+#pragma use_dxc
 
 AppendStructuredBuffer<uint> VirtualRequests;
 

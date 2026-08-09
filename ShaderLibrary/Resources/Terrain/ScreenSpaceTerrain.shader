@@ -22,7 +22,6 @@ Shader "Hidden/Screen Space Terrain"
             #pragma fragment Fragment
             #pragma multi_compile _ VIRTUAL_TEXTURING_ON
             #pragma use_dxc
-            #pragma require WaveMath
             #include "ScreenSpaceTerrain.hlsl"
             ENDHLSL
         }

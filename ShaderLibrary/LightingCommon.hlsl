@@ -55,7 +55,6 @@ cbuffer PointLightData
 
 StructuredBuffer<Light> PointLights;
 StructuredBuffer<uint> LightDepthMinMax;
-Texture2D<uint2> LightDepthRanges;
 Texture2DArray<uint> VisibleLightBits;
 
 float LuminanceToIlluminance(float luminance, float solidAngle)

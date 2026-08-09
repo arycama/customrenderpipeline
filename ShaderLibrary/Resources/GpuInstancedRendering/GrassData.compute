@@ -3,6 +3,7 @@
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Utility.hlsl"
 
 #pragma kernel GrassData
+#pragma use_dxc
 
 float BladeCount;
 float MinScale;

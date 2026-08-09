@@ -229,6 +229,8 @@ namespace CustomRenderPipeline
             pass.ReadResource<TerrainViewData>(true);
         }),
 
+        new LightCulling(asset.LightCulling, renderGraph),
+
         new GenerateHiZ(renderGraph, GenerateHiZ.HiZMode.Max),
 
 		// This is just here to avoid memory leaks when GPU driven rendering isn't used.
@@ -346,7 +348,7 @@ namespace CustomRenderPipeline
         new WaterCaustics(renderGraph, asset.OceanSettings),
 		
 		// Depends on light, plus ambient
-		new LightCulling(asset.LightCulling, renderGraph, Resources.Load<ComputeShader>("LightCulling")),
+		new LightCulling(asset.LightCulling, renderGraph),
         new VolumetricLighting(asset.VolumetricLightingSettings, renderGraph),
 
         new UnderwaterLighting(renderGraph, asset.OceanSettings),
@@ -412,7 +414,6 @@ namespace CustomRenderPipeline
             pass.ReadResource<CloudShadowDataResult>();
             pass.ReadResource<VolumetricLighting.Result>();
             pass.ReadResource<PointLightData>();
-            pass.ReadResource<LightCulling.Result>();
             pass.ReadResource<ParticleShadowData>();
             pass.ReadResource<VirtualTextureData>(true);
             pass.ReadResource<TerrainFrameData>(true);

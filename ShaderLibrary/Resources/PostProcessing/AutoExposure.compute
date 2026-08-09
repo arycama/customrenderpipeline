@@ -6,9 +6,10 @@
 
 #pragma kernel LuminanceBuildHistogram
 #pragma kernel LuminanceHistogramAverage
+#pragma use_dxc
 
-static const uint HistogramBins = 256;
-static const uint SqrtHistogramBins = sqrt(HistogramBins);
+const static uint HistogramBins = 256;
+const static uint SqrtHistogramBins = 16;
 
 Texture2D<float> ExposureCompensationTexture;
 RWStructuredBuffer<uint> LuminanceHistogram;

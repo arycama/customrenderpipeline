@@ -1,4 +1,5 @@
 #pragma kernel FillData
+#pragma use_dxc
 
 #include "../../Common.hlsl"
 #include "../../Packing.hlsl"

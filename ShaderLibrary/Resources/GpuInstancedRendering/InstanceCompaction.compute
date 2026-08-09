@@ -5,6 +5,7 @@
 #include "../../SpaceTransforms.hlsl"
 
 #pragma kernel InstanceCompaction
+#pragma use_dxc
 
 // Since we use groupId to index the instance prefix sum, this needs to match
 const static uint threadCount = 1024;
@@ -56,7 +57,6 @@ void InstanceCompaction(uint id : SV_DispatchThreadID, uint groupId : SV_GroupID
 	
 	// TODO: Currently a lod greater than cutoff distance will still be rendered. We can't remove it from drawing here because
 	// the total instance sum has already been calculated by a previous prefix sum. Should instead remove it from the instance cull stage
-	[unroll]
 	for (uint i = 0; i < maxLodCount; i++)
 	{
 		uint index = instanceTypeData.lodSizebufferPosition + i;

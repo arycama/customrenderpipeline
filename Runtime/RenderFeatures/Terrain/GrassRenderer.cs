@@ -28,7 +28,7 @@ namespace CustomRenderPipeline
         private Material grassCoverageMaterial;
         private TerrainSystem terrainSystem;
 
-        private int idMapVersion, heightMapVersion;
+        private int idMapVersion;
         private int previousResolution;
 
         public GrassRenderer(Settings settings, RenderGraph renderGraph, QuadtreeCull quadtreeCull, TerrainSystem terrainSystem) : base(renderGraph)

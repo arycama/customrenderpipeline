@@ -45,7 +45,6 @@ namespace CustomRenderPipeline
                 pass.ReadResource<CloudShadowDataResult>();
 
                 pass.ReadResource<PointLightData>();
-                pass.ReadResource<LightCulling.Result>();
                 pass.ReadResource<VolumetricLighting.Result>();
 
                 pass.ReadResource<ParticleShadowData>();

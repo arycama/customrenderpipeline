@@ -1,6 +1,7 @@
 #pragma kernel GenerateLengthToSmoothness
 #pragma kernel ShortenNormal
 #pragma kernel MipNormalAndSmoothness
+#pragma use_dxc
 
 #include "../Color.hlsl"
 #include "../Common.hlsl"

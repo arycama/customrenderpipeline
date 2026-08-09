@@ -10,6 +10,7 @@
 #pragma kernel CalculateNormals
 #pragma kernel GenerateFilteredMips
 #pragma kernel Spectrum
+#pragma use_dxc
 
 RWBuffer<float> OceanDispersionWrite;
 RWBuffer<float4> OceanSpectrumWrite;

@@ -1,6 +1,7 @@
 // Helper functions for block compression
 
 #pragma kernel BC3Compress
+#pragma use_dxc
 
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Color.hlsl"
 //#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"

@@ -50,7 +50,6 @@ namespace CustomRenderPipeline
                     pass.PreventNewSubPass = true;
                     pass.ReadResource<SkyReflectionAmbientData>();
                     pass.ReadResource<PointLightData>();
-                    pass.ReadResource<LightCulling.Result>();
                     pass.ReadResource<AutoExposureData>();
                     pass.ReadResource<AtmospherePropertiesAndTables>();
                     pass.ReadResource<TerrainFrameData>(true);

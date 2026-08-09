@@ -6,61 +6,69 @@
 
 // TODO: Maybe template these things with macros so we don't have to define half and float types
 // Float
-bool1 select(float1 c, float1 a, float1 b) { return c ? a : b; }
-bool2 select(float2 c, float2 a, float2 b) { return c ? a : b; }
-bool3 select(float3 c, float3 a, float3 b) { return c ? a : b; }
-bool4 select(float4 c, float4 a, float4 b) { return c ? a : b; }
+#ifdef __INTELLISENSE__
+bool select(bool c, float a, float b) { return c ? a : b; }
+bool2 select(bool2 c, float2 a, float2 b) { return c ? a : b; }
+bool3 select(bool3 c, float3 a, float3 b) { return c ? a : b; }
+bool4 select(bool4 c, float4 a, float4 b) { return c ? a : b; }
+#endif
 
-float1 FastSign(float1 x) { return select(x >= 0.0, 1.0, -1.0); };
+float FastSign(float x) { return select(x >= 0.0, 1.0, -1.0); };
 float2 FastSign(float2 x) { return select(x >= 0.0, 1.0, -1.0); };
 float3 FastSign(float3 x) { return select(x >= 0.0, 1.0, -1.0); };
 float4 FastSign(float4 x) { return select(x >= 0.0, 1.0, -1.0); };
 
-float1 Flip(float1 a, bool1 flip) { return select(flip, -a, a); }
+float Flip(float a, bool flip) { return select(flip, -a, a); }
 float2 Flip(float2 a, bool2 flip) { return select(flip, -a, a); }
 float3 Flip(float3 a, bool3 flip) { return select(flip, -a, a); }
 float4 Flip(float4 a, bool4 flip) { return select(flip, -a, a); }
 
-float1 SignFlip(float1 a, float1 s) { return Flip(a, FastSign(s)); }
+float SignFlip(float a, float s) { return Flip(a, FastSign(s)); }
 float2 SignFlip(float2 a, float2 s) { return Flip(a, FastSign(s)); }
 float3 SignFlip(float3 a, float3 s) { return Flip(a, FastSign(s)); }
 float4 SignFlip(float4 a, float4 s) { return Flip(a, FastSign(s)); }
 
-void Swap(inout float1 a, inout float1 b, bool1 swap = true) { float1 t = a; a = select(swap, b, a); b = select(swap, t, b); }
+void Swap(inout float a, inout float b, bool swap = true) { float t = a; a = select(swap, b, a); b = select(swap, t, b); }
 void Swap(inout float2 a, inout float2 b, bool2 swap = true) { float2 t = a; a = select(swap, b, a); b = select(swap, t, b); }
 void Swap(inout float3 a, inout float3 b, bool3 swap = true) { float3 t = a; a = select(swap, b, a); b = select(swap, t, b); }
 void Swap(inout float4 a, inout float4 b, bool4 swap = true) { float4 t = a; a = select(swap, b, a); b = select(swap, t, b); }
 
-void SignSwap(inout float1 a, inout float1 b, float1 s) { Swap(a, b, s < 0.0); }
+void SignSwap(inout float a, inout float b, float s) { Swap(a, b, s < 0.0); }
 void SignSwap(inout float2 a, inout float2 b, float2 s) { Swap(a, b, s < 0.0); }
 void SignSwap(inout float3 a, inout float3 b, float3 s) { Swap(a, b, s < 0.0); }
 void SignSwap(inout float4 a, inout float4 b, float4 s) { Swap(a, b, s < 0.0); }
 
 // Half
-bool1 select(half1 c, half1 a, half1 b) { return c ? a : b; }
+bool select(half c, half a, half b) { return c ? a : b; }
 bool2 select(half2 c, half2 a, half2 b) { return c ? a : b; }
 bool3 select(half3 c, half3 a, half3 b) { return c ? a : b; }
 bool4 select(half4 c, half4 a, half4 b) { return c ? a : b; }
 
-half1 FastSign(half1 x) { return select(x >= 0.0, 1.0, -1.0); };
-half2 FastSign(half2 x) { return select(x >= 0.0, 1.0, -1.0); };
-half3 FastSign(half3 x) { return select(x >= 0.0, 1.0, -1.0); };
-half4 FastSign(half4 x) { return select(x >= 0.0, 1.0, -1.0); };
+half FastSign(half x) { return select(x >= 0.0h, 1.0h, -1.0h); };
+half2 FastSign(half2 x) { return select(x >= 0.0h, 1.0h, -1.0h); };
+half3 FastSign(half3 x) { return select(x >= 0.0h, 1.0h, -1.0h); };
+half4 FastSign(half4 x) { return select(x >= 0.0h, 1.0h, -1.0h); };
 
-half1 Flip(half1 a, bool1 flip) { return select(flip, -a, a); }
+half Flip(half a, bool flip) { return select(flip, -a, a); }
 half2 Flip(half2 a, bool2 flip) { return select(flip, -a, a); }
 half3 Flip(half3 a, bool3 flip) { return select(flip, -a, a); }
 half4 Flip(half4 a, bool4 flip) { return select(flip, -a, a); }
 
-half1 SignFlip(half1 a, half1 s) { return Flip(a, FastSign(s)); }
+half SignFlip(half a, half s) { return Flip(a, FastSign(s)); }
 half2 SignFlip(half2 a, half2 s) { return Flip(a, FastSign(s)); }
 half3 SignFlip(half3 a, half3 s) { return Flip(a, FastSign(s)); }
 half4 SignFlip(half4 a, half4 s) { return Flip(a, FastSign(s)); }
 
-void SignSwap(inout half1 a, inout half1 b, half1 s) { Swap(a, b, s < 0.0); }
-void SignSwap(inout half2 a, inout half2 b, half2 s) { Swap(a, b, s < 0.0); }
-void SignSwap(inout half3 a, inout half3 b, half3 s) { Swap(a, b, s < 0.0); }
-void SignSwap(inout half4 a, inout half4 b, half4 s) { Swap(a, b, s < 0.0); }
+void SignSwap(inout half a, inout half b, half s) { Swap(a, b, s < 0.0h); }
+void SignSwap(inout half2 a, inout half2 b, half2 s) { Swap(a, b, s < 0.0h); }
+void SignSwap(inout half3 a, inout half3 b, half3 s) { Swap(a, b, s < 0.0h); }
+void SignSwap(inout half4 a, inout half4 b, half4 s) { Swap(a, b, s < 0.0h); }
+
+// Uint
+void Swap(inout uint a, inout uint b, bool swap = true) { uint t = a; a = select(swap, b, a); b = select(swap, t, b); }
+void Swap(inout uint2 a, inout uint2 b, bool2 swap = true) { uint2 t = a; a = select(swap, b, a); b = select(swap, t, b); }
+void Swap(inout uint3 a, inout uint3 b, bool3 swap = true) { uint3 t = a; a = select(swap, b, a); b = select(swap, t, b); }
+void Swap(inout uint4 a, inout uint4 b, bool4 swap = true) { uint4 t = a; a = select(swap, b, a); b = select(swap, t, b); }
 
 const static uint CubemapFacePositiveX = 0;
 const static uint CubemapFaceNegativeX = 1;
@@ -141,7 +149,7 @@ float2 QuadOffset(float2 screenPos)
 //	return 4.0 * frac(0.5 * screenPos) - 1.0;
 //}
 
-float1 QuadReadAcrossX(float1 value, float2 screenPos)
+float QuadReadAcrossX(float value, float2 screenPos)
 {
 	#ifdef INTRINSIC_QUAD_SHUFFLE
 		return QuadReadAcrossX(value);
@@ -177,7 +185,7 @@ float4 QuadReadAcrossX(float4 value, float2 screenPos)
 	#endif
 }
 
-float1 QuadReadAcrossY(float1 value, float2 screenPos)
+float QuadReadAcrossY(float value, float2 screenPos)
 {
 	#ifdef INTRINSIC_QUAD_SHUFFLE
 		return QuadReadAcrossY(value);
@@ -251,7 +259,7 @@ uint Log2Pow2(uint a)
 	return firstbitlow(a);
 }
 
-uint1 Exp2Pow2(uint1 a) { return 1u << a; }
+uint Exp2Pow2(uint a) { return 1u << a; }
 uint2 Exp2Pow2(uint2 a) { return 1u << a; }
 uint3 Exp2Pow2(uint3 a) { return 1u << a; }
 uint4 Exp2Pow2(uint4 a) { return 1u << a; }
@@ -310,10 +318,10 @@ float Bilerp(float4 y, float2 i)
 	return lerp(bottom, top, i.y);
 }
 
-float1 Bilerp(float1 v0, float1 v1, float1 v2, float1 v3, float2 i)
+float Bilerp(float v0, float v1, float v2, float v3, float2 i)
 {
-	float1 bottom = lerp(v0, v3, i.x);
-	float1 top = lerp(v1, v2, i.x);
+	float bottom = lerp(v0, v3, i.x);
+	float top = lerp(v1, v2, i.x);
 	return lerp(bottom, top, i.y);
 }
 

@@ -8,6 +8,7 @@
 
 #pragma kernel AmbientProbe
 #pragma editor_sync_compilation
+#pragma use_dxc
 
 float _MipLevel;
 static const uint _SampleCount = 512;

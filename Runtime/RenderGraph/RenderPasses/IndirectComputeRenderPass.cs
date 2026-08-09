@@ -1,5 +1,6 @@
 ﻿using System;
 using UnityEngine;
+using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 
 namespace CustomRenderPipeline
@@ -11,6 +12,7 @@ namespace CustomRenderPipeline
 
         public void Initialize(ComputeShader computeShader, ResourceHandle<GraphicsBuffer> indirectBuffer, int kernelIndex = 0, uint argsOffset = 0)
         {
+            Assert.IsNotNull(computeShader);
             this.computeShader = computeShader ?? throw new ArgumentNullException(nameof(computeShader));
             this.kernelIndex = kernelIndex;
             this.indirectBuffer = indirectBuffer;

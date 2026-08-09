@@ -54,7 +54,6 @@ namespace CustomRenderPipeline
                 pass.ReadResource<AutoExposureData>();
                 pass.ReadResource<WaterShadowResult>();
                 pass.ReadResource<PointLightData>();
-                pass.ReadResource<LightCulling.Result>();
                 pass.ReadResource<ShadowData>();
                 pass.ReadResource<DfgData>();
                 pass.ReadResource<CloudShadowDataResult>();
@@ -118,7 +117,6 @@ namespace CustomRenderPipeline
 
                     pass.ReadResource<SkyReflectionAmbientData>();
                     pass.ReadResource<PointLightData>();
-                    pass.ReadResource<LightCulling.Result>();
                     pass.ReadResource<AutoExposureData>();
                     pass.ReadResource<AtmospherePropertiesAndTables>();
                     pass.ReadResource<TerrainFrameData>(true);

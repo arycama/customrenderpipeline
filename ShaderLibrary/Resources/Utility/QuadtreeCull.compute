@@ -7,6 +7,7 @@
 #pragma kernel InstanceCull
 #pragma kernel IndirectArgs
 #pragma kernel CalculateLod
+#pragma use_dxc
 
 #pragma multi_compile _ FIRST
 #pragma multi_compile _ FINAL

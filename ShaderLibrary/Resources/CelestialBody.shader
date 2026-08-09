@@ -9,6 +9,7 @@ Shader "Surface/Celestial Body"
             HLSLPROGRAM
             #pragma vertex Vertex
             #pragma fragment Fragment
+		    #pragma use_dxc
             #include "CelestialBody.hlsl"
             ENDHLSL
         }

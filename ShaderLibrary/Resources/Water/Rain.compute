@@ -5,6 +5,7 @@
 
 #pragma kernel Initialize
 #pragma kernel Update
+#pragma use_dxc
 
 RWStructuredBuffer<float4> Positions;
 
