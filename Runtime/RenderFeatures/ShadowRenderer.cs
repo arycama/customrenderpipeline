@@ -73,7 +73,7 @@ namespace CustomRenderPipeline
                 {
                     pass.WriteTexture(pointShadows);
 
-                    if (requestData.directionalShadowRequests.Count > 0)
+                    if (requestData.pointShadowRequests.Count > 0)
                     {
                         pass.SetRenderFunction(static (command, pass, pointShadows) =>
                         {

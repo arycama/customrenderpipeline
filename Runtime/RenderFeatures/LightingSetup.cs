@@ -406,7 +406,7 @@ namespace CustomRenderPipeline
                 Rcp(binWidth)
             ));
 
-            renderGraph.SetResource(new PointLightData(pointLightData, pointLightBuffer, pointLightCount, lightDepthMinMaxBuffer, visibleLightBits, intersectingLightCount));
+            renderGraph.SetResource(new PointLightData(pointLightData, pointLightBuffer, pointLightCount, lightDepthMinMaxBuffer, visibleLightBits, intersectingLightCount, default));
             renderGraph.SetResource(new ShadowRequestsData(directionalShadowRequests, pointShadowRequests, spotShadowRequests));
         }
 

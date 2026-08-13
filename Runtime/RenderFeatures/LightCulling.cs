@@ -17,11 +17,13 @@ namespace CustomRenderPipeline
 
         private readonly Settings settings;
         private readonly Material pointLightMaterial;
+        private readonly int uavSlot;
 
-        public LightCulling(Settings settings, RenderGraph renderGraph) : base(renderGraph)
+        public LightCulling(Settings settings, RenderGraph renderGraph, string pointLightShader = "Hidden/Point Light", int uavSlot = 0) : base(renderGraph)
         {
             this.settings = settings;
-			pointLightMaterial = new Material(Shader.Find("Hidden/Point Light")) { hideFlags = HideFlags.HideAndDontSave };
+            this.uavSlot = uavSlot;
+            pointLightMaterial = new Material(Shader.Find(pointLightShader)) { hideFlags = HideFlags.HideAndDontSave };
         }
 
         public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
@@ -31,7 +33,7 @@ namespace CustomRenderPipeline
 
             void RenderPass(int count, int indexOffset, int passIndex, Int2 viewSize, int viewCount)
             {
-                using var pass = renderGraph.AddDrawInstancedProceduralRenderPass("Light Culling", (pointLightData, indexOffset));
+                using var pass = renderGraph.AddDrawInstancedProceduralRenderPass("Light Culling", (pointLightData, indexOffset, uavSlot));
                 pass.Initialize(settings.PointLightMesh, 0, pointLightMaterial, count, viewSize, viewCount, passIndex: passIndex);
                 pass.WriteRtHandleDepth<CameraDepth>();
 
@@ -41,7 +43,7 @@ namespace CustomRenderPipeline
 
                 pass.SetRenderFunction(static (command, pass, data) =>
                 {
-                    command.SetRandomWriteTarget(3, pass.GetRenderTexture(data.pointLightData.visibleLightBits));
+                    command.SetRandomWriteTarget(data.uavSlot, pass.GetRenderTexture(data.pointLightData.visibleLightBits));
                     pass.SetInt("IndexOffset", data.indexOffset);
                 });
             }
