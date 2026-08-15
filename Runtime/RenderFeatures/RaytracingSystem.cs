@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Reflection;
 using UnityEngine;
 
 using UnityEngine.Rendering;
@@ -23,42 +24,6 @@ namespace CustomRenderPipeline
         {
             this.settings = settings;
 
-            var rasSettings = new RayTracingAccelerationStructure.Settings(RayTracingAccelerationStructure.ManagementMode.Manual, RayTracingAccelerationStructure.RayTracingModeMask.Everything, settings.RaytracingLayers);
-
-            rtas = new RayTracingAccelerationStructure(rasSettings);
-            var config = new RayTracingInstanceCullingConfig
-            {
-                flags = RayTracingInstanceCullingFlags.None,
-                subMeshFlagsConfig = new RayTracingSubMeshFlagsConfig
-                {
-                    opaqueMaterials = RayTracingSubMeshFlags.Enabled | RayTracingSubMeshFlags.ClosestHitOnly,
-                    alphaTestedMaterials = RayTracingSubMeshFlags.Enabled,
-                    transparentMaterials = RayTracingSubMeshFlags.Disabled,
-                },
-
-                instanceTests = new RayTracingInstanceCullingTest[]
-                {
-                new()
-                {
-                    allowOpaqueMaterials = true,
-                    allowAlphaTestedMaterials = true,
-                    allowTransparentMaterials = false, // TODO: Support?
-					layerMask = settings.RaytracingLayers,
-                    shadowCastingModeMask = (1 << (int)ShadowCastingMode.Off) | (1 << (int)ShadowCastingMode.On) | (1 << (int)ShadowCastingMode.TwoSided),
-                    instanceMask = 1
-                }
-                },
-
-                alphaTestedMaterialConfig = new RayTracingInstanceMaterialConfig
-                {
-                    renderQueueLowerBound = (int)RenderQueue.AlphaTest,
-                    renderQueueUpperBound = (int)RenderQueue.GeometryLast,
-                    //optionalShaderKeywords = new string[1] { "CUTOUT_ON" },
-                }
-            };
-
-            rtas.ClearInstances();
-            _ = rtas.CullInstances(ref config);
         }
 
         public override void Render(ScriptableRenderContext context)
@@ -66,12 +31,24 @@ namespace CustomRenderPipeline
             if (!settings.Enabled)
                 return;
 
+            if (rtas == null)
+            {
+                var rasSettings = new RayTracingAccelerationStructure.Settings(RayTracingAccelerationStructure.ManagementMode.Automatic, RayTracingAccelerationStructure.RayTracingModeMask.Everything, settings.RaytracingLayers);
+                rtas = new RayTracingAccelerationStructure(rasSettings);
+            }
+
             // TODO: Could use camera relative, 1 rtas per camera
-            using (var pass = renderGraph.AddGenericRenderPass("RTAS Update", rtas))
+            using (var pass = renderGraph.AddGenericRenderPass("RTAS Update", (rtas, context)))
             {
                 pass.SetRenderFunction(static (command, pass, data) =>
                 {
-                    command.BuildRayTracingAccelerationStructure(data);
+                    var field = typeof(RayTracingAccelerationStructure).GetField("m_Ptr", BindingFlags.NonPublic | BindingFlags.Instance);
+                    if (data.rtas != null && (IntPtr)field.GetValue(data.rtas) != IntPtr.Zero)
+                    {
+                        command.BuildRayTracingAccelerationStructure(data.rtas);
+                        data.context.ExecuteCommandBuffer(command);
+                        command.Clear();
+                    }
                 });
             }
 
@@ -84,10 +61,11 @@ namespace CustomRenderPipeline
             if (renderGraph.RenderPipeline.IsDisposingFromRenderDoc)
                 return;
 
-            //if (rtas != null)
-            //    rtas.Dispose();
-
-            rtas = null;
+            if (rtas != null)
+            {
+                //rtas.Release();
+                rtas = null;
+            }
         }
     }
 

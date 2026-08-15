@@ -34,6 +34,8 @@ namespace CustomRenderPipeline
             void RenderPass(int count, int indexOffset, int passIndex, Int2 viewSize, int viewCount)
             {
                 using var pass = renderGraph.AddDrawInstancedProceduralRenderPass("Light Culling", (pointLightData, indexOffset, uavSlot));
+                pass.PreventNewSubPass = true;
+
                 pass.Initialize(settings.PointLightMesh, 0, pointLightMaterial, count, viewSize, viewCount, passIndex: passIndex);
                 pass.WriteRtHandleDepth<CameraDepth>();
 

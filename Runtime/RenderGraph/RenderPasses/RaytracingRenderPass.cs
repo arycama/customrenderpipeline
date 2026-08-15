@@ -99,6 +99,9 @@ namespace CustomRenderPipeline
 
         protected override void Execute()
         {
+            for (var i = 0; i < colorBindings.Count; i++)
+                Command.SetRayTracingTextureParam(shader, colorBindings[i].Item2, GetRenderTexture(colorBindings[i].Item1));
+
             foreach (var keyword in keywords)
                 Command.EnableKeyword(new GlobalKeyword(keyword));
 
@@ -115,12 +118,6 @@ namespace CustomRenderPipeline
             foreach (var keyword in keywords)
                 Command.DisableKeyword(new GlobalKeyword(keyword));
         }
-
-        //protected override void SetupTargets()
-        //{
-        //	for (var i = 0; i < colorBindings.Count; i++)
-        //		Command.SetRayTracingTextureParam(shader, colorBindings[i].Item2, GetRenderTexture(colorBindings[i].Item1));
-        //}
 
         public override void SetMatrix(string propertyName, Matrix4x4 value)
         {

@@ -22,8 +22,6 @@ namespace CustomRenderPipeline
         private List<FrameRenderFeature> perFrameRenderFeatures;
         private List<ViewRenderFeature> perCameraRenderFeatures;
 
-        private readonly CommandBuffer command;
-
         protected readonly RenderGraph renderGraph;
         private readonly bool renderDocLoaded;
         private readonly Dictionary<int, string> renderCameraProfileMarkers = new();
@@ -58,8 +56,6 @@ namespace CustomRenderPipeline
 
             GraphicsSettings.disableBuiltinCustomRenderTextureUpdate = true;
             LoadStoreActionDebugModeSettings.LoadStoreDebugModeEnabled = false;
-
-            command = new CommandBuffer();// { name = "Render Camera" };
         }
 
         protected override void Dispose(bool disposing)
@@ -74,8 +70,6 @@ namespace CustomRenderPipeline
 
             foreach (var renderFeature in perCameraRenderFeatures)
                 renderFeature?.Dispose();
-
-            command.Release();
 
             renderGraph.Dispose();
         }
@@ -339,13 +333,24 @@ namespace CustomRenderPipeline
 
             ListPool<ViewPassData>.Release(viewPassDatas);
 
-            renderGraph.Execute(command, context);
+            try
+            {
+                using (var commandScope = CommandBufferPool.Get(out var command, "Render Frame"))
+                {
+                    renderGraph.Execute(command, context);
+                    context.ExecuteCommandBuffer(command);
+                }
 
-            context.ExecuteCommandBuffer(command);
-            command.Clear();
-            context.Submit();
+                context.Submit();
+            }
+            catch(Exception)
+            {
 
-            renderGraph.CleanupCurrentFrame();
+            }
+            finally
+            {
+                renderGraph.CleanupCurrentFrame();
+            }
         }
     }
 

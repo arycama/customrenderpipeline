@@ -1,11 +1,11 @@
-#pragma once
+#ifndef RAYTRACING_INCLUDED
+#define RAYTRACING_INCLUDED
 
-#include "Common.hlsl"
-#include "Lighting.hlsl"
-#include "ImageBasedLighting.hlsl"
+#include "Math.hlsl"
+#include "MatrixUtils.hlsl"
 
 #ifdef __INTELLISENSE__
-	static const uint RAY_FLAG_NONE = 0x00,
+	const static uint RAY_FLAG_NONE = 0x00,
 	RAY_FLAG_FORCE_OPAQUE = 0x01,
 	RAY_FLAG_FORCE_NON_OPAQUE = 0x02,
 	RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH = 0x04,
@@ -38,7 +38,7 @@ struct SurfaceHit
 	float distance;
 };
 
-struct RayPayload
+struct RayPayloadDefault
 {
 	uint packedColor;
 	float hitDistance;
@@ -86,7 +86,7 @@ struct MeshInfo
 {
 	uint vertexSize[kMaxVertexStreams]; // The stride between 2 consecutive vertices in the vertex buffer. There is an entry for each vertex stream.
 	uint baseVertex; // A value added to each index before reading a vertex from the vertex buffer.
-	uint vertexStart;
+    uint vertexStart;
 	uint indexSize; // 0 when an index buffer is not used, 2 for 16-bit indices or 4 for 32-bit indices.
 	uint indexStart; // The location of the first index to read from the index buffer.
 };
@@ -114,22 +114,45 @@ struct VertexAttributeInfo
 #define kVertexAttributeTexCoord7   11
 #define kVertexAttributeCount       12
 
+static float4 unity_DefaultVertexAttributes[kVertexAttributeCount] =
+{
+    float4(0, 0, 0, 0),     // kVertexAttributePosition - always present in ray tracing.
+    float4(0, 0, 1, 0),     // kVertexAttributeNormal
+    float4(1, 0, 0, 1),     // kVertexAttributeTangent
+    float4(1, 1, 1, 1),     // kVertexAttributeColor
+    float4(0, 0, 0, 0),     // kVertexAttributeTexCoord0
+    float4(0, 0, 0, 0),     // kVertexAttributeTexCoord1
+    float4(0, 0, 0, 0),     // kVertexAttributeTexCoord2
+    float4(0, 0, 0, 0),     // kVertexAttributeTexCoord3
+    float4(0, 0, 0, 0),     // kVertexAttributeTexCoord4
+    float4(0, 0, 0, 0),     // kVertexAttributeTexCoord5
+    float4(0, 0, 0, 0),     // kVertexAttributeTexCoord6
+    float4(0, 0, 0, 0),     // kVertexAttributeTexCoord7
+};
+
 // Supported
 #define kVertexFormatFloat          0
 #define kVertexFormatFloat16        1
 #define kVertexFormatUNorm8         2
 #define kVertexFormatUNorm16        4
 #define kVertexFormatSNorm16        5
+// Not supported
+#define kVertexFormatSNorm8         3
+#define kVertexFormatUInt8          6
+#define kVertexFormatSInt8          7
+#define kVertexFormatUInt16         8
+#define kVertexFormatSInt16         9
+#define kVertexFormatUInt32         10
+#define kVertexFormatSInt32         11
 
-
-StructuredBuffer<MeshInfo> unity_MeshInfo_RT;
-StructuredBuffer<VertexAttributeInfo> unity_MeshVertexDeclaration_RT;
+StructuredBuffer<MeshInfo>              unity_MeshInfo_RT;
+StructuredBuffer<VertexAttributeInfo>   unity_MeshVertexDeclaration_RT;
 ByteAddressBuffer unity_MeshVertexBuffers_RT[kMaxVertexStreams];
 ByteAddressBuffer unity_MeshIndexBuffer_RT;
 
 static float4 unity_VertexChannelMask_RT[5] =
 {
-	float4(0, 0, 0, 0),
+    float4(0, 0, 0, 0),
     float4(1, 0, 0, 0),
     float4(1, 1, 0, 0),
     float4(1, 1, 1, 0),
@@ -150,27 +173,43 @@ float DecodeSNorm16(uint data)
 
 uint3 UnityRayTracingFetchTriangleIndices(uint primitiveIndex)
 {
+	uint3 indices;
+
 	MeshInfo meshInfo = unity_MeshInfo_RT[0];
 
-	uint offsetInBytes = (meshInfo.indexStart + primitiveIndex * 3) << 1;
-	uint dwordAlignedOffset = offsetInBytes & ~3;
-	uint2 fourIndices = unity_MeshIndexBuffer_RT.Load2(dwordAlignedOffset);
-
-	uint3 indices;
-	if(dwordAlignedOffset == offsetInBytes)
+	if(meshInfo.indexSize == 2)
 	{
-		indices.x = fourIndices.x & 0xffff;
-		indices.y = (fourIndices.x >> 16) & 0xffff;
-		indices.z = fourIndices.y & 0xffff;
+		uint offsetInBytes = (meshInfo.indexStart + primitiveIndex * 3) << 1;
+		uint dwordAlignedOffset = offsetInBytes & ~3;
+		uint2 fourIndices = unity_MeshIndexBuffer_RT.Load2(dwordAlignedOffset);
+
+		if(dwordAlignedOffset == offsetInBytes)
+		{
+			indices.x = fourIndices.x & 0xffff;
+			indices.y = (fourIndices.x >> 16) & 0xffff;
+			indices.z = fourIndices.y & 0xffff;
+		}
+		else
+		{
+			indices.x = (fourIndices.x >> 16) & 0xffff;
+			indices.y = fourIndices.y & 0xffff;
+			indices.z = (fourIndices.y >> 16) & 0xffff;
+		}
+
+		indices = indices + meshInfo.baseVertex.xxx;
 	}
-	else
+	else if (meshInfo.indexSize == 4)
 	{
-		indices.x = (fourIndices.x >> 16) & 0xffff;
-		indices.y = fourIndices.y & 0xffff;
-		indices.z = (fourIndices.y >> 16) & 0xffff;
+		uint offsetInBytes = (meshInfo.indexStart + primitiveIndex * 3) << 2;
+		indices = unity_MeshIndexBuffer_RT.Load3(offsetInBytes) + meshInfo.baseVertex.xxx;
+	}
+	else // meshInfo.indexSize == 0
+	{
+		uint firstVertexIndex = primitiveIndex * 3 + meshInfo.vertexStart;
+		indices = firstVertexIndex.xxx + uint3(0, 1, 2);
 	}
 
-	return indices + meshInfo.baseVertex.x;
+	return indices;
 }
 
 // Checks if the vertex attribute attributeType is present in one of the unity_MeshVertexBuffers_RT vertex streams.
@@ -187,6 +226,10 @@ float2 UnityRayTracingFetchVertexAttribute2(uint vertexIndex, uint attributeType
 	VertexAttributeInfo vertexDecl = unity_MeshVertexDeclaration_RT[attributeType];
 
 	uint attributeDimension = vertexDecl.Dimension;
+
+	if(!UnityRayTracingHasVertexAttribute(attributeType) || attributeDimension > 4)
+		return unity_DefaultVertexAttributes[attributeType].xy;
+
 	uint attributeByteOffset = vertexDecl.ByteOffset;
 	uint vertexSize = unity_MeshInfo_RT[0].vertexSize[vertexDecl.Stream];
 	uint vertexAddress = vertexIndex * vertexSize;
@@ -195,11 +238,7 @@ float2 UnityRayTracingFetchVertexAttribute2(uint vertexIndex, uint attributeType
 
 	float2 value = float2(0, 0);
 
-	#ifdef SHADER_STAGE_RAYTRACING
-		ByteAddressBuffer vertexBuffer = unity_MeshVertexBuffers_RT[NonUniformResourceIndex(vertexDecl.Stream)];
-	#else
-		ByteAddressBuffer vertexBuffer = unity_MeshVertexBuffers_RT[0];
-	#endif
+	ByteAddressBuffer vertexBuffer = unity_MeshVertexBuffers_RT[NonUniformResourceIndex(vertexDecl.Stream)];
 
 	if(attributeFormat == kVertexFormatFloat)
 	{
@@ -234,6 +273,10 @@ float3 UnityRayTracingFetchVertexAttribute3(uint vertexIndex, uint attributeType
 	VertexAttributeInfo vertexDecl = unity_MeshVertexDeclaration_RT[attributeType];
 
 	uint attributeDimension = vertexDecl.Dimension;
+
+	if (!UnityRayTracingHasVertexAttribute(attributeType) || attributeDimension > 4)
+		return unity_DefaultVertexAttributes[attributeType].xyz;
+
 	uint attributeByteOffset = vertexDecl.ByteOffset;
 	uint vertexSize = unity_MeshInfo_RT[0].vertexSize[vertexDecl.Stream];
 	uint vertexAddress = vertexIndex * vertexSize;
@@ -242,12 +285,8 @@ float3 UnityRayTracingFetchVertexAttribute3(uint vertexIndex, uint attributeType
 
 	float3 value = float3(0, 0, 0);
 
-	#ifdef SHADER_STAGE_RAYTRACING
-		ByteAddressBuffer vertexBuffer = unity_MeshVertexBuffers_RT[NonUniformResourceIndex(vertexDecl.Stream)];
-	#else
-		ByteAddressBuffer vertexBuffer = unity_MeshVertexBuffers_RT[0];
-	#endif
-	
+	ByteAddressBuffer vertexBuffer = unity_MeshVertexBuffers_RT[NonUniformResourceIndex(vertexDecl.Stream)];
+
 	if(attributeFormat == kVertexFormatFloat)
 	{
 		value = asfloat(vertexBuffer.Load3(attributeAddress));
@@ -278,7 +317,12 @@ float3 UnityRayTracingFetchVertexAttribute3(uint vertexIndex, uint attributeType
 		uint data = vertexBuffer.Load(attributeAddress);
 		value = float3(data & 0xff, (data & 0xff00) >> 8, (data & 0xff0000) >> 16) / 255.0f;
 	}
-
+	else if (attributeFormat == kVertexFormatSNorm8)
+	{
+		uint data = vertexBuffer.Load(attributeAddress);
+		value = float3(data & 0xff, (data & 0xff00) >> 8, (data & 0xff0000) >> 16) / 255.0f * 2.0 - 1.0;
+	}
+	
 	return unity_VertexChannelMask_RT[attributeDimension].xyz * value;
 }
 
@@ -288,6 +332,10 @@ float4 UnityRayTracingFetchVertexAttribute4(uint vertexIndex, uint attributeType
 	VertexAttributeInfo vertexDecl = unity_MeshVertexDeclaration_RT[attributeType];
 
 	uint attributeDimension = vertexDecl.Dimension;
+
+	if (!UnityRayTracingHasVertexAttribute(attributeType) || attributeDimension > 4)
+		return unity_DefaultVertexAttributes[attributeType];
+
 	uint attributeByteOffset = vertexDecl.ByteOffset;
 	uint vertexSize = unity_MeshInfo_RT[0].vertexSize[vertexDecl.Stream];
 	uint vertexAddress = vertexIndex * vertexSize;
@@ -346,22 +394,30 @@ Vert FetchVertex(uint vertexIndex)
 
 float1 BarycentricInterpolate(float1 x, float1 y, float1 z, float u, float v)
 {
-	return mad(v, z, mad(u, y, mad(-x, v, mad(-x, u, x))));
+	float w = 1.0 - u - v;
+	return w * x + u * y + v * z;
+	//return mad(v, z, mad(u, y, mad(-x, v, mad(-x, u, x))));
 }
 
 float2 BarycentricInterpolate(float2 x, float2 y, float2 z, float u, float v)
 {
-	return mad(v, z, mad(u, y, mad(-x, v, mad(-x, u, x))));
+	float w = 1.0 - u - v;
+	return w * x + u * y + v * z;
+	//return mad(v, z, mad(u, y, mad(-x, v, mad(-x, u, x))));
 }
 
 float3 BarycentricInterpolate(float3 x, float3 y, float3 z, float u, float v)
 {
-	return mad(v, z, mad(u, y, mad(-x, v, mad(-x, u, x))));
+	float w = 1.0 - u - v;
+	return w * x + u * y + v * z;
+	//return mad(v, z, mad(u, y, mad(-x, v, mad(-x, u, x))));
 }
 
 float4 BarycentricInterpolate(float4 x, float4 y, float4 z, float u, float v)
 {
-	return mad(v, z, mad(u, y, mad(-x, v, mad(-x, u, x))));
+	float w = 1.0 - u - v;
+	return w * x + u * y + v * z;
+	//return mad(v, z, mad(u, y, mad(-x, v, mad(-x, u, x))));
 }
 
 Vert InterpolateVertices(Vert v0, Vert v1, Vert v2, float2 barycentrics)
@@ -459,3 +515,5 @@ float RoughnessToSpreadAngle(float roughness)
     // FIXME: The mapping will most likely need adjustment...
 	return roughness * Pi / 8;
 }
+
+#endif

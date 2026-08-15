@@ -16,7 +16,7 @@ float _RaytracingBias, _RaytracingDistantBias;
 float3 Albedo;
 
 [shader("miss")]
-void MissShader(inout RayPayload payload : SV_RayPayload)
+void MissShader(inout RayPayloadDefault payload : SV_RayPayload)
 {
 	payload.packedColor = 0.0;
 	payload.hitDistance = 0.0;
@@ -63,7 +63,7 @@ void RayGeneration()
 	ray.TMin = 0.0;
 	ray.TMax = 1e10f;
 	
-	RayPayload payload;
+	RayPayloadDefault payload;
 	payload.packedColor = 0.0;
 	payload.hitDistance = 0.0;
 	

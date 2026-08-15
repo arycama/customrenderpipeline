@@ -16,6 +16,7 @@ public class CommandBufferPool
 	{
 		var result = pool.Get(out value);
 		value.name = name;
+        value.Clear();
 		return result;
 	}
 
