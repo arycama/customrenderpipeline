@@ -102,6 +102,15 @@ float3 OctahedralUvToNormal(float2 uv)
 	return normalize(n);
 }
 
+half3 OctahedralUvToNormal(half2 uv)
+{
+	half2 f = 2.0h * uv - 1.0h;
+	half3 n = half3(f, 1.0h - abs(f.x) - abs(f.y));
+	half t = saturate(-n.z);
+	n.xy += select(n.xy >= 0.0h, -t, t);
+	return normalize(n);
+}
+
 uint Float3ToR11G11B10(float3 rgb)
 {
 	uint3 data = (((asuint(rgb) + 0xC8000000) >> uint2(17, 18).xxy) & uint2(0x7ff, 0x3ff).xxy) << uint3(0, 11, 22);
@@ -197,12 +206,12 @@ half3 UnpackNormal(half4 packedNormal)
 
 half2 UnpackNormalDerivativesSNorm(half2 packedNormal)
 {
-	return packedNormal * rsqrt(saturate(1.0 - SqrLength(packedNormal)));
+	return packedNormal * rsqrt(saturate(1.0h - SqrLength(packedNormal)));
 }
 
 half2 UnpackNormalDerivativesUNorm(half2 packedNormal)
 {
-	return UnpackNormalDerivativesSNorm(2.0 * packedNormal - 1.0);
+	return UnpackNormalDerivativesSNorm(2.0h * packedNormal - 1.0h);
 }
 
 float4 EncodeFloatRGBA(float x)

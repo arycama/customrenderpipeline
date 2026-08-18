@@ -24,6 +24,16 @@ const static float RcpFourPi = rcp(FourPi);
 const static float RcpHalfPi = rcp(HalfPi);
 const static float SqrtPi = sqrt(Pi);
 
+const static half Pih = radians(180.0h);
+const static half TwoPih = 2.0h * Pih;
+const static half FourPih = 4.0h * Pih;
+const static half HalfPih = Pih / 2.0h;
+const static half RcpPih = rcp(Pih);
+const static half RcpTwoPih = rcp(TwoPih);
+const static half RcpFourPih = rcp(FourPih);
+const static half RcpHalfPih = rcp(HalfPih);
+const static half SqrtPih = sqrt(Pih);
+
 float1 Sq(float1 x) { return x * x; }
 float2 Sq(float2 x) { return x * x; }
 float3 Sq(float3 x) { return x * x; }

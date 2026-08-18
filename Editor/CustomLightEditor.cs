@@ -93,7 +93,9 @@ namespace CustomRenderPipeline
 
             settings.DrawColor();
             settings.shadowsType.intValue = EditorGUILayout.Toggle("Shadows", settings.shadowsType.intValue != 0) ? 2 : 0;
-            _ = EditorGUILayout.PropertyField(settings.shadowsNearPlane);
+
+            if(settings.shadowsType.intValue > 0)
+                _ = EditorGUILayout.PropertyField(settings.shadowsNearPlane);
 
             _ = EditorGUILayout.PropertyField(settings.lightType);
 

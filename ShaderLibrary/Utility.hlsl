@@ -39,10 +39,12 @@ void SignSwap(inout float3 a, inout float3 b, float3 s) { Swap(a, b, s < 0.0); }
 void SignSwap(inout float4 a, inout float4 b, float4 s) { Swap(a, b, s < 0.0); }
 
 // Half
-bool select(half c, half a, half b) { return c ? a : b; }
-bool2 select(half2 c, half2 a, half2 b) { return c ? a : b; }
-bool3 select(half3 c, half3 a, half3 b) { return c ? a : b; }
-bool4 select(half4 c, half4 a, half4 b) { return c ? a : b; }
+#ifdef __INTELLISENSE__
+bool select(bool c, half a, half b) { return c ? a : b; }
+bool2 select(bool2 c, half2 a, half2 b) { return c ? a : b; }
+bool3 select(bool3 c, half3 a, half3 b) { return c ? a : b; }
+bool4 select(bool4 c, half4 a, half4 b) { return c ? a : b; }
+#endif
 
 half FastSign(half x) { return select(x >= 0.0h, 1.0h, -1.0h); };
 half2 FastSign(half2 x) { return select(x >= 0.0h, 1.0h, -1.0h); };
@@ -142,6 +144,11 @@ float4 AlphaPremultiplyInv(float4 value)
 float2 QuadOffset(float2 screenPos)
 {
 	return (frac(0.5 * screenPos) >= 0.5) * 2.0 - 1.0;
+}
+
+half2 QuadOffset(half2 screenPos)
+{
+	return (frac(0.5h * screenPos) >= 0.5h) * 2.0h - 1.0h;
 }
 
 //float2 QuadOffset(float2 screenPos)
@@ -248,6 +255,105 @@ float4 QuadReadAcrossDiagonal(float4 value, float2 screenPos)
 	return X - (ddy_fine(value) * quadDir.y);
 }
 
+half QuadReadAcrossX(half value, half2 screenPos)
+{
+	#ifdef INTRINSIC_QUAD_SHUFFLE
+		return QuadReadAcrossX(value);
+	#else
+		return value - ddx_fine(value) * QuadOffset(screenPos).x;
+	#endif
+}
+
+half2 QuadReadAcrossX(half2 value, half2 screenPos)
+{
+	#ifdef INTRINSIC_QUAD_SHUFFLE
+		return QuadReadAcrossX(value);
+	#else
+		return value - ddx_fine(value) * QuadOffset(screenPos).x;
+	#endif
+}
+
+half3 QuadReadAcrossX(half3 value, half2 screenPos)
+{
+	#ifdef INTRINSIC_QUAD_SHUFFLE
+		return QuadReadAcrossX(value);
+	#else
+		return value - ddx_fine(value) * QuadOffset(screenPos).x;
+	#endif
+}
+
+half4 QuadReadAcrossX(half4 value, half2 screenPos)
+{
+	#ifdef INTRINSIC_QUAD_SHUFFLE
+		return QuadReadAcrossX(value);
+	#else
+		return value - ddx_fine(value) * QuadOffset(screenPos).x;
+	#endif
+}
+
+half QuadReadAcrossY(half value, half2 screenPos)
+{
+	#ifdef INTRINSIC_QUAD_SHUFFLE
+		return QuadReadAcrossY(value);
+	#else
+		return value - ddy_fine(value) * QuadOffset(screenPos).y;
+	#endif
+}
+
+half2 QuadReadAcrossY(half2 value, half2 screenPos)
+{
+	#ifdef INTRINSIC_QUAD_SHUFFLE
+		return QuadReadAcrossY(value);
+	#else
+		return value - ddy_fine(value) * QuadOffset(screenPos).y;
+	#endif
+}
+
+half3 QuadReadAcrossY(half3 value, half2 screenPos)
+{
+	#ifdef INTRINSIC_QUAD_SHUFFLE
+		return QuadReadAcrossY(value);
+	#else
+		return value - ddy_fine(value) * QuadOffset(screenPos).y;
+	#endif
+}
+
+half4 QuadReadAcrossY(half4 value, half2 screenPos)
+{
+	#ifdef INTRINSIC_QUAD_SHUFFLE
+		return QuadReadAcrossY(value);
+	#else
+		return value - ddy_fine(value) * QuadOffset(screenPos).y;
+	#endif
+}
+
+half QuadReadAcrossDiagonal(half value, half2 screenPos)
+{
+	half dX = ddx_fine(value);
+	half dY = ddy_fine(value);
+	half2 quadDir = QuadOffset(screenPos);
+	half X = value - (dX * quadDir.x);
+	return X - (ddy_fine(value) * quadDir.y);
+}
+
+half3 QuadReadAcrossDiagonal(half3 value, half2 screenPos)
+{
+	half3 dX = ddx_fine(value);
+	half3 dY = ddy_fine(value);
+	half2 quadDir = QuadOffset(screenPos);
+	half3 X = value - (dX * quadDir.x);
+	return X - (ddy_fine(value) * quadDir.y);
+}
+
+half4 QuadReadAcrossDiagonal(half4 value, half2 screenPos)
+{
+	half4 dX = ddx_fine(value);
+	half4 dY = ddy_fine(value);
+	half2 quadDir = QuadOffset(screenPos);
+	half4 X = value - (dX * quadDir.x);
+	return X - (ddy_fine(value) * quadDir.y);
+}
+
 float2 SnapToTexelCenter(float2 uv, float2 textureSize, float2 rcpTextureSize)
 {
 	float2 localUv = uv * textureSize - 0.5;
@@ -270,7 +376,12 @@ uint BitOr(uint4 x) { return x.x | BitOr(x.yzw); }
 
 bool Checker(float2 position)
 {
-	return frac(dot(position, 0.5)) < 0.5;
+	return frac(dot(position, 0.5)) >= 0.5;
+}
+
+bool Checker(half2 position)
+{
+	return frac(dot(position, 0.5h)) >= 0.5h;
 }
 
 // draw procedural with 2 triangles has index order (0,1,2)  (0,2,3)
@@ -450,8 +561,12 @@ float4 SampleGradient(Gradient gradient, float time)
 
 float Select4(float4 a, float b)
 {
-	//return dot(a, b == float4(0, 1, 2, 3));
-	return b ? (b == 3 ? a.w : (b == 2 ? a.z : a.y)) : a.x;
+	return b > 2.0 ? (b > 3.0 ? a.w : a.z) : (b > 1.0 ? a.y : a.x);
+}
+
+half Select4(half4 a, half b)
+{
+	return b > 2.0h ? (b > 3.0h ? a.w : a.z) : (b > 1.0h ? a.y : a.x);
 }
 
 float CalculateMipLevel(float2 dx, float2 dy, float2 resolution)

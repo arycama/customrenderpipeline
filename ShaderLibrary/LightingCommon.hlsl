@@ -5,18 +5,18 @@
 
 struct Light
 {
-	float3 position;
-	float rangeSquaredRcp;
-	float3 forward;
-	float angleScale;
-	float3 color;
-	float angleOffset;
+	half3 position;
+	half rangeSquaredRcp;
+	half3 forward;
+	half angleScale;
+	half3 color;
+	half angleOffset;
 	float4 cullingSphere;
-	float3 right;
+	half3 right;
 	uint lightType;
-	float3 up;
+	half3 up;
 	uint shadowIndex;
-	float2 size;
+	half2 size;
 	float shadowProjectionX;
 	float shadowProjectionY;
 };

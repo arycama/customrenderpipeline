@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 47996dfb8af93f44b8c55e697e3ea42e
+guid: c7ee5e159e04fd64a88d11aff4cbe2c2
 ModelImporter:
   serializedVersion: 24200
   internalIDToNameTable: []
@@ -49,7 +49,7 @@ ModelImporter:
     generateSecondaryUV: 0
     useFileUnits: 1
     keepQuads: 0
-    weldVertices: 1
+    weldVertices: 0
     bakeAxisConversion: 0
     preserveHierarchy: 0
     skinWeightsMode: 0
@@ -59,7 +59,7 @@ ModelImporter:
     generateMeshLods: 0
     meshLodGenerationFlags: 0
     maximumMeshLod: -1
-    meshOptimizationFlags: -1
+    meshOptimizationFlags: 0
     indexFormat: 0
     secondaryUVAngleDistortion: 8
     secondaryUVAreaDistortion: 15.000001

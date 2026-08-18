@@ -210,17 +210,17 @@ float3x3 PrimariesToMatrix(float2 xy_red, float2 xy_green, float2 xy_blue, float
 	return transpose(float3x3(scale.x * XYZ_red, scale.y * XYZ_green, scale.z * XYZ_blue));
 }
 
-float3x3 RGBtoXYZ(Chromaticities chroma, float Y = 1.0)
+half3x3 RGBtoXYZ(Chromaticities chroma, float Y = 1.0)
 {
 	return PrimariesToMatrix(chroma.red, chroma.green, chroma.blue, chroma.white);
 }
 
-float3x3 XYZtoRGB(Chromaticities chroma, float Y = 1.0)
+half3x3 XYZtoRGB(Chromaticities chroma, float Y = 1.0)
 {
 	return Inverse(RGBtoXYZ(chroma, Y));
 }
 
-float3 Rec709ToXYZ(float3 rec709)
+half3 Rec709ToXYZ(half3 rec709)
 {
 	return mul(RGBtoXYZ(REC709_PRI), rec709);
 }
@@ -308,7 +308,7 @@ float3 XYZToRec2020(float3 XYZ)
 	return mul(XYZtoRGB(REC2020_PRI), XYZ);
 }
 
-float3 Rec709ToRec2020(float3 rec709)
+half3 Rec709ToRec2020(half3 rec709)
 {
 	return XYZToRec2020(Rec709ToXYZ(rec709));
 }
@@ -419,7 +419,7 @@ float3 Rec2020ToP3D65(float3 rec2020)
 
 // ICtCp
 // RGB with sRGB/Rec.709 primaries to ICtCp
-float3 Rec2020ToICtCp(float3 rec2020)
+half3 Rec2020ToICtCp(half3 rec2020)
 {
 	float3 lms = Rec2020ToLMS(rec2020);
 	float3 lmsPq = LinearToST2084(lms);
@@ -434,9 +434,9 @@ float3 Rec2020ToOffsetICtCp(float3 rec2020)
 	return iCtCp;
 }
 
-float3 Rec709ToICtCp(float3 rec709)
+half3 Rec709ToICtCp(half3 rec709)
 {
-	float3 rec2020 = Rec709ToRec2020(rec709);
+	half3 rec2020 = Rec709ToRec2020(rec709);
 	return Rec2020ToICtCp(rec2020);
 }
 
