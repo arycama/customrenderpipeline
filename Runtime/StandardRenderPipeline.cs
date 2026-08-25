@@ -79,8 +79,7 @@ namespace CustomRenderPipeline
 
         new RaytracingSystem(renderGraph, asset.RayTracingSettings),
 
-        new GenericFrameRenderFeature(renderGraph, (ScriptableRenderContext context) =>
-        {
+        new GenericFrameRenderFeature(renderGraph, context => {
             var overlayMatrix = Float4x4.Ortho(-Screen.width / 2f, Screen.width / 2f, -Screen.height / 2f, Screen.height / 2f, 0, 1);
             overlayMatrix = GL.GetGPUProjectionMatrix(overlayMatrix, false);
 
@@ -291,7 +290,7 @@ namespace CustomRenderPipeline
 
             pass.SetRenderFunction(static (command, pass, data) =>
             {
-                command.CopyTexture(pass.GetRenderTexture(data.Item1), pass.GetRenderTexture(data.cameraDepthCopy));
+                command.CopyTexture(pass.GetRenderTexture(data.handle), pass.GetRenderTexture(data.cameraDepthCopy));
             });
         }),
 

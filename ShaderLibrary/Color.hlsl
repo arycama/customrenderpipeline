@@ -442,12 +442,12 @@ half3 Rec709ToICtCp(half3 rec709)
 
 half3 RgbToYCbCr(half3 rgb)
 {
-	return mul(half3x4(0.2126h, 0.7152h, 0.0722h, 0.0h, -0.1146h, -0.3854h, 0.5h, 0.5h, 0.5h, -0.4542h, -0.0458h, 0.5h), half4(rgb, 1.0h));
+	return mul(half3x4(0.299h, 0.587h, 0.114h, 0.0h, -0.084033h, -0.164975h, 0.249020h, 0.498039h, 0.249020h, -0.208514h, -0.040495h, 0.498039h), half4(sqrt(rgb), 1.0h));
 }
 
 half3 YCbCrToRgb(half3 yCbCr)
 {
-	return mul(half3x4(1.0h, 0.0h, 1.5748h, -0.7874h, 1.0h, -0.1873h, -0.4681h, 0.3277h, 1.0h, 1.8556h, 0.0h, -0.9278h), half4(yCbCr, 1.0h));
+	return Sq(mul(half3x4(1.0h, 0.000743h, 2.815015h, -1.402358h, 1.0h, -0.690970h, -1.433831h, 1.058234h, 1.0h, 3.557909h, 0.000271h, -1.772113h), half4(yCbCr, 1.0h)));
 }
 
 float3 FastTonemap(float3 color, float luminance)
