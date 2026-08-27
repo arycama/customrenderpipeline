@@ -21,7 +21,7 @@ Shader "Hidden/Decal Composite"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentCopy
-            #pragma use_dxc
+            #pragma require WaveMath
             #include "DecalComposite.hlsl"
             ENDHLSL
         }
@@ -33,7 +33,7 @@ Shader "Hidden/Decal Composite"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentCombine
-            #pragma use_dxc
+            #pragma require WaveMath
             #include "DecalComposite.hlsl"
             ENDHLSL
         }

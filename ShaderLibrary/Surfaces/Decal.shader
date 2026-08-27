@@ -32,7 +32,7 @@ Shader "Surface/Decal"
 			HLSLPROGRAM
 			#pragma vertex Vertex
 			#pragma fragment Fragment
-			#pragma use_dxc
+            #pragma require WaveMath
 			#pragma multi_compile_instancing
 			#include "Decal.hlsl"
 			ENDHLSL
