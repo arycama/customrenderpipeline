@@ -52,6 +52,7 @@ float DistanceToSphereOutside(float height, float cosAngle, float radius)
 	float discriminant = Sq(height) * (Sq(cosAngle) - 1.0) + Sq(radius);
 	return max(0.0, -height * cosAngle - sqrt(max(0.0, discriminant)));
 }
+
 bool SolveQuadratic(float a, float halfB, float c, out float2 roots)
 {
 	float det = Sq(halfB) - a * c;
@@ -72,6 +73,37 @@ bool IntersectRaySphere(float3 start, float3 dir, float radius, out float2 inter
 bool RayIntersectsSphere(float height, float cosAngle, float radius)
 {
 	return (cosAngle < 0.0) && ((Sq(height) * (Sq(cosAngle) - 1.0) + Sq(radius)) >= 0.0);
+}
+
+bool RaySolidAngleIntersection(float3 rayOrigin, float3 rayDirection, float3 axis, float cosThetaSq, float radiusSq, float radiusTimesCosTheta)
+{
+	float coA = dot(rayOrigin, axis);
+	float roRo = dot(rayOrigin, rayOrigin);
+	float cCone = Sq(coA) - roRo * cosThetaSq;
+	float cSphere = roRo - radiusSq;
+
+    // Ray origin inside
+	bool isInside = coA >= 0.0 && cCone >= 0.0 && cSphere <= 0.0;
+
+    // Spherical cap surface
+	float rdRd = dot(rayDirection, rayDirection);
+	float rdRo = dot(rayDirection, rayOrigin);
+	
+	float2 tS;
+	SolveQuadratic(rdRd, rdRo, cSphere, tS);
+	float rdA = dot(rayDirection, axis);
+	float yS = rdA * tS.x + coA;
+	bool capHit = tS.x > 0.0 && yS >= radiusTimesCosTheta;
+
+    // Cone surface
+	float aCone = Sq(rdA) - rdRd * cosThetaSq;
+	float bCone = rdA * coA - rdRo * cosThetaSq;
+	float2 tC;
+	SolveQuadratic(aCone, bCone, cCone, tC);
+	float yC = rdA * tC.y + coA;
+	bool coneHit = tC.y > 0.0 && yC > 0.0 && yC <= radiusTimesCosTheta;
+	
+	return isInside || capHit || coneHit;
 }
 
 // Plane equation: {(a, b, c) = N, d = -dot(N, P)}.
