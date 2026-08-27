@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
@@ -52,7 +53,7 @@ namespace CustomRenderPipeline
 
             Array.Resize(ref pointLights, Max(pointLights.Length, lightCount));
             Array.Resize(ref pointLightDepths, Max(pointLightDepths.Length, lightCount));
-            var pointLightCount = 0;
+            int pointLightCount = 0, spotLightCount = 0, localLightCount = 0;
 
             var n = viewPassData.near;
             var f = settings.DirectionalShadowDistance;
@@ -262,9 +263,13 @@ namespace CustomRenderPipeline
                         light.shadowNearPlane * light.range / (light.range - light.shadowNearPlane)
                     );
 
-                    pointLights[pointLightCount] = lightData;
-                    pointLightDepths[pointLightCount] = cullingSphere.z - cullingSphere.w * 1.075f;
-                    pointLightCount++;
+                    pointLights[localLightCount] = lightData;
+                    pointLightDepths[localLightCount] = cullingSphere.z - cullingSphere.w * 1.075f;
+                    localLightCount++;
+                    if (visibleLight.lightType == LightType.Point)
+                        pointLightCount++;
+                    else
+                        spotLightCount++;
                 }
             }
 
@@ -338,7 +343,10 @@ namespace CustomRenderPipeline
 
             // Add sorted lights to list
             var binWidth = viewPassData.far / lightCulling.DepthSlices;
-            var intersectingLightCount = 0;
+            int intersectingPointLightCount = 0, intersectingSpotLightCount = 0;
+
+            var pointLightIndices = new List<int>();
+            var spotLightIndices = new List<int>();
 
             for (var i = 0; i < pointLightCount; i++)
             {
@@ -364,29 +372,47 @@ namespace CustomRenderPipeline
                     lightDepthMinMax[j] = BitPack(currentMin, 16, 0) | BitPack(currentMax, 16, 16);
                 }
 
+                var isSpotLight = light.angleScale > 0.0f;
+
+                if (isSpotLight)
+                    spotLightIndices.Add(i);
+                else
+                    pointLightIndices.Add(i);
+
                 // Check if the light intersects the near plane
                 if (pointLightDepths[i] < viewPassData.near)
-                    intersectingLightCount = i + 1;
+                {
+                    if (isSpotLight)
+                        intersectingSpotLightCount++;
+                    else
+                        intersectingPointLightCount++;
+                }
             }
 
             var tileCountX = DivRoundUp(viewPassData.viewSize.x, lightCulling.TileSize);
             var tileCountY = DivRoundUp(viewPassData.viewSize.y, lightCulling.TileSize);
             var lightIndexCount = DivRoundUp(pointLightCount, 32);
 
-            var pointLightBuffer = pointLightCount == 0 ? renderGraph.EmptyBuffer : renderGraph.GetBuffer(pointLightCount, UnsafeUtility.SizeOf<LightData>());
+            var pointLightBuffer = localLightCount == 0 ? renderGraph.EmptyBuffer : renderGraph.GetBuffer(localLightCount, UnsafeUtility.SizeOf<LightData>());
+            var pointLightIndicesBuffer = pointLightIndices.Count == 0 ? renderGraph.EmptyBuffer : renderGraph.GetBuffer(pointLightIndices.Count);
+            var spotLightIndicesBuffer = spotLightIndices.Count == 0 ? renderGraph.EmptyBuffer : renderGraph.GetBuffer(spotLightIndices.Count);
             var lightDepthMinMaxBuffer = renderGraph.GetBuffer(lightCulling.DepthSlices);
             var visibleLightBits = renderGraph.GetTexture(new(tileCountX, tileCountY), GraphicsFormat.R32_UInt, lightIndexCount, TextureDimension.Tex2DArray, isRandomWrite: true);
 
-            using (var pass = renderGraph.AddGenericRenderPass("Set Light Data", (pointLights, pointLightCount, pointLightBuffer, lightDepthMinMaxBuffer, lightDepthMinMax, visibleLightBits)))
+            using (var pass = renderGraph.AddGenericRenderPass("Set Light Data", (pointLights, localLightCount, pointLightBuffer, lightDepthMinMaxBuffer, lightDepthMinMax, visibleLightBits, pointLightIndicesBuffer, spotLightIndicesBuffer, pointLightIndices, spotLightIndices)))
             {
                 pass.WriteBuffer("", pointLightBuffer);
                 pass.WriteBuffer("", lightDepthMinMaxBuffer);
+                pass.WriteBuffer("", pointLightIndicesBuffer);
+                pass.WriteBuffer("", spotLightIndicesBuffer);
                 pass.WriteTexture(visibleLightBits);
 
                 pass.SetRenderFunction(static (command, pass, data) =>
                 {
-                    command.SetBufferData(pass.GetBuffer(data.pointLightBuffer), data.pointLights, 0, 0, data.pointLightCount);
+                    command.SetBufferData(pass.GetBuffer(data.pointLightBuffer), data.pointLights, 0, 0, data.localLightCount);
                     command.SetBufferData(pass.GetBuffer(data.lightDepthMinMaxBuffer), data.lightDepthMinMax);
+                    command.SetBufferData(pass.GetBuffer(data.pointLightIndicesBuffer), data.pointLightIndices);
+                    command.SetBufferData(pass.GetBuffer(data.spotLightIndicesBuffer), data.spotLightIndices);
 
                     // Clear the light bitmask texture
                     command.SetRenderTarget(pass.GetRenderTexture(data.visibleLightBits), 0, CubemapFace.Unknown, -1);
@@ -406,7 +432,7 @@ namespace CustomRenderPipeline
                 Rcp(binWidth)
             ));
 
-            renderGraph.SetResource(new PointLightData(pointLightData, pointLightBuffer, pointLightCount, lightDepthMinMaxBuffer, visibleLightBits, intersectingLightCount, default));
+            renderGraph.SetResource(new PointLightData(pointLightData, pointLightBuffer, pointLightCount, spotLightCount, lightDepthMinMaxBuffer, visibleLightBits, intersectingPointLightCount, intersectingSpotLightCount, pointLightIndicesBuffer, spotLightIndicesBuffer, null));
             renderGraph.SetResource(new ShadowRequestsData(directionalShadowRequests, pointShadowRequests, spotShadowRequests));
         }
 
