@@ -372,7 +372,7 @@ namespace CustomRenderPipeline
                     lightDepthMinMax[j] = BitPack(currentMin, 16, 0) | BitPack(currentMax, 16, 16);
                 }
 
-                var isSpotLight = light.angleScale > 0.0f;
+                var isSpotLight = light.angleScale != 0.0f;
 
                 if (isSpotLight)
                     spotLightIndices.Add(i);
