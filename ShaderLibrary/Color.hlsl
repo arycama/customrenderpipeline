@@ -374,6 +374,11 @@ float3 LinearToGamma(float3 c)
 	return select(c <= 0.0031308, sRgbLo, sRgbHi);
 }
 
+float4 LinearToGamma(float4 c)
+{
+	return float4(LinearToGamma(c.rgb), c.a);
+}
+
 // LUV
 float3 XYZToLuv(float3 xyz)
 {

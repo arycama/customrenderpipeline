@@ -80,7 +80,7 @@ struct Vert
 	float4 tangent;
 };
 
-#define kMaxVertexStreams 8
+const static uint kMaxVertexStreams = 8;
 
 struct MeshInfo
 {
@@ -100,19 +100,19 @@ struct VertexAttributeInfo
 };
 
 // Valid values for the attributeType parameter in UnityRayTracingFetchVertexAttribute* functions.
-#define kVertexAttributePosition    0
-#define kVertexAttributeNormal      1
-#define kVertexAttributeTangent     2
-#define kVertexAttributeColor       3
-#define kVertexAttributeTexCoord0   4
-#define kVertexAttributeTexCoord1   5
-#define kVertexAttributeTexCoord2   6
-#define kVertexAttributeTexCoord3   7
-#define kVertexAttributeTexCoord4   8
-#define kVertexAttributeTexCoord5   9
-#define kVertexAttributeTexCoord6   10
-#define kVertexAttributeTexCoord7   11
-#define kVertexAttributeCount       12
+const static uint kVertexAttributePosition = 0;
+const static uint kVertexAttributeNormal = 1;
+const static uint kVertexAttributeTangent = 2;
+const static uint kVertexAttributeColor = 3;
+const static uint kVertexAttributeTexCoord0 = 4;
+const static uint kVertexAttributeTexCoord1 = 5;
+const static uint kVertexAttributeTexCoord2 = 6;
+const static uint kVertexAttributeTexCoord3 = 7;
+const static uint kVertexAttributeTexCoord4 = 8;
+const static uint kVertexAttributeTexCoord5 = 9;
+const static uint kVertexAttributeTexCoord6 = 10;
+const static uint kVertexAttributeTexCoord7 = 11;
+const static uint kVertexAttributeCount = 12;
 
 static float4 unity_DefaultVertexAttributes[kVertexAttributeCount] =
 {
@@ -131,22 +131,23 @@ static float4 unity_DefaultVertexAttributes[kVertexAttributeCount] =
 };
 
 // Supported
-#define kVertexFormatFloat          0
-#define kVertexFormatFloat16        1
-#define kVertexFormatUNorm8         2
-#define kVertexFormatUNorm16        4
-#define kVertexFormatSNorm16        5
-// Not supported
-#define kVertexFormatSNorm8         3
-#define kVertexFormatUInt8          6
-#define kVertexFormatSInt8          7
-#define kVertexFormatUInt16         8
-#define kVertexFormatSInt16         9
-#define kVertexFormatUInt32         10
-#define kVertexFormatSInt32         11
+const static uint kVertexFormatFloat = 0;
+const static uint kVertexFormatFloat16 = 1;
+const static uint kVertexFormatUNorm8 = 2;
+const static uint kVertexFormatUNorm16 = 4;
+const static uint kVertexFormatSNorm16 = 5;
 
-StructuredBuffer<MeshInfo>              unity_MeshInfo_RT;
-StructuredBuffer<VertexAttributeInfo>   unity_MeshVertexDeclaration_RT;
+// Not supported
+const static uint kVertexFormatSNorm8 = 3;
+const static uint kVertexFormatUInt8 = 6;
+const static uint kVertexFormatSInt8 = 7;
+const static uint kVertexFormatUInt16 = 8;
+const static uint kVertexFormatSInt16 = 9;
+const static uint kVertexFormatUInt32 = 10;
+const static uint kVertexFormatSInt32 = 11;
+
+StructuredBuffer<MeshInfo> unity_MeshInfo_RT;
+StructuredBuffer<VertexAttributeInfo> unity_MeshVertexDeclaration_RT;
 ByteAddressBuffer unity_MeshVertexBuffers_RT[kMaxVertexStreams];
 ByteAddressBuffer unity_MeshIndexBuffer_RT;
 
