@@ -138,12 +138,48 @@ float CubeMapFaceT(float3 dir)
 	}
 }
 
-float2 CubeMapFaceUv(float3 direction)
+float2 CubeMapFaceUv(float3 v, out float faceIndex, out float majorAxisRcp)
 {
-	float2 uv;
-	uv.x = CubeMapFaceS(direction);
-	uv.y = CubeMapFaceT(direction);
-	return uv * rcp(CubeMapMajorAxis(direction)) + 0.5;
+	#if 1
+		float3 vAbs = abs(v);
+		float ma;
+		float2 uv;
+		if (vAbs.z >= vAbs.x && vAbs.z >= vAbs.y)
+		{
+			faceIndex = v.z < 0.0 ? 5.0 : 4.0;
+			ma = vAbs.z * 2.0;
+			uv = float2(v.z < 0.0 ? -v.x : v.x, -v.y);
+		}
+		else if (vAbs.y >= vAbs.x)
+		{
+			faceIndex = v.y < 0.0 ? 3.0 : 2.0;
+			ma = vAbs.y * 2.0;
+			uv = float2(v.x, v.y < 0.0 ? -v.z : v.z);
+		}
+		else
+		{
+			faceIndex = v.x < 0.0 ? 1.0 : 0.0;
+			ma = vAbs.x * 2.0;
+			uv = float2(v.x < 0.0 ? v.z : -v.z, -v.y);
+		}
+	
+		majorAxisRcp = rcp(abs(ma));
+		return uv * majorAxisRcp + 0.5;
+	#else
+		float2 uv;
+		uv.x = CubeMapFaceS(v);
+		uv.y = CubeMapFaceT(v);
+		float ma = CubeMapMajorAxis(v);
+		faceIndex = CubeMapFaceID(v);
+		float rcpMa = rcp(abs(ma));
+		return uv * rcpMa + 0.5;
+	#endif
+}
+
+float2 CubeMapFaceUv(float3 v, out float faceIndex)
+{
+	float majorAxisRcp;
+	return CubeMapFaceUv(v, faceIndex, majorAxisRcp);
 }
 
 float4 AlphaPremultiply(float4 value)

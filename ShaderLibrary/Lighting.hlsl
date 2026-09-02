@@ -173,8 +173,8 @@ float GetLightAttenuationAndShadow(Light light, float3 position, float dither, b
 		float dominantAxis = Max3(abs(lightVector));
 		float depth = (dominantAxis * light.shadowProjectionX + light.shadowProjectionY) / dominantAxis;
 			
-		float faceIndex = CubeMapFaceID(-lightVector);
-		float2 uv = CubeMapFaceUv(-lightVector);
+		float faceIndex;
+		float2 uv = CubeMapFaceUv(-lightVector, faceIndex);
 		float shadowIndex = light.shadowIndex + faceIndex;
 		attenuation *= PointShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(uv, shadowIndex), depth);
 	}
