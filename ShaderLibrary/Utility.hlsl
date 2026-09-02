@@ -72,61 +72,78 @@ void Swap(inout uint2 a, inout uint2 b, bool2 swap = true) { uint2 t = a; a = se
 void Swap(inout uint3 a, inout uint3 b, bool3 swap = true) { uint3 t = a; a = select(swap, b, a); b = select(swap, t, b); }
 void Swap(inout uint4 a, inout uint4 b, bool4 swap = true) { uint4 t = a; a = select(swap, b, a); b = select(swap, t, b); }
 
-const static uint CubemapFacePositiveX = 0;
-const static uint CubemapFaceNegativeX = 1;
-const static uint CubemapFacePositiveY = 2;
-const static uint CubemapFaceNegativeY = 3;
-const static uint CubemapFacePositiveZ = 4;
-const static uint CubemapFaceNegativeZ = 5;
-
 #ifndef INTRINSIC_CUBEMAP_FACE_ID
 float CubeMapFaceID(float3 dir)
 {
-	float faceID;
-
-	if (abs(dir.z) >= abs(dir.x) && abs(dir.z) >= abs(dir.y))
+	if ((abs(dir.z) >= abs(dir.x)) && (abs(dir.z) >= abs(dir.y)))
 	{
-		faceID = (dir.z < 0.0) ? CubemapFaceNegativeZ : CubemapFacePositiveZ;
+		return dir.z < 0.0 ? 5.0 : 4.0;
 	}
 	else if (abs(dir.y) >= abs(dir.x))
 	{
-		faceID = (dir.y < 0.0) ? CubemapFaceNegativeY : CubemapFacePositiveY;
+		return dir.y < 0.0 ? 3.0 : 2.0;
 	}
 	else
 	{
-		faceID = (dir.x < 0.0) ? CubemapFaceNegativeX : CubemapFacePositiveX;
+		return dir.x < 0.0 ? 1.0 : 0.0;
 	}
-
-	return faceID;
 }
 #endif
 
-float2 CubeMapFaceUv(float3 direction, uint index)
+float CubeMapMajorAxis(float3 dir)
 {
-	float2 uv = 0;
-	switch (index)
+	if ((abs(dir.z) >= abs(dir.x)) && (abs(dir.z) >= abs(dir.y)))
 	{
-		case CubemapFacePositiveX:
-			uv = -direction.zy / direction.x;
-			break;
-		case CubemapFaceNegativeX:
-			uv = float2(-direction.z, direction.y) / direction.x;
-			break;
-		case CubemapFacePositiveY:
-			uv = direction.xz / direction.y;
-			break;
-		case CubemapFaceNegativeY:
-			uv = float2(-direction.x, direction.z) / direction.y;
-			break;
-		case CubemapFacePositiveZ:
-			uv = float2(direction.x, -direction.y) / direction.z;
-			break;
-		case CubemapFaceNegativeZ:
-			uv = direction.xy / direction.z;
-			break;
+		return dir.z * 2.0;
 	}
-	
-	return 0.5 * uv + 0.5;
+	else if (abs(dir.y) >= abs(dir.x))
+	{
+		return dir.y * 2.0;
+	}
+	else
+	{
+		return dir.x * 2.0;
+	}
+}
+
+float CubeMapFaceS(float3 dir)
+{
+	if ((abs(dir.z) >= abs(dir.x)) && (abs(dir.z) >= abs(dir.y)))
+	{
+		return dir.z < 0.0 ? -dir.x : dir.x;
+	}
+	else if (abs(dir.y) >= abs(dir.x))
+	{
+		return dir.x;
+	}
+	else
+	{
+		return dir.x < 0.0 ? dir.z : -dir.z;
+	}
+}
+
+float CubeMapFaceT(float3 dir)
+{
+	if ((abs(dir.z) >= abs(dir.x)) && (abs(dir.z) >= abs(dir.y)))
+	{
+		return -dir.y;
+	}
+	else if (abs(dir.y) >= abs(dir.x))
+	{
+		return dir.y < 0.0 ? -dir.z : dir.z;
+	}
+	else
+	{
+		return -dir.y;
+	}
+}
+
+float2 CubeMapFaceUv(float3 direction)
+{
+	float2 uv;
+	uv.x = CubeMapFaceS(direction);
+	uv.y = CubeMapFaceT(direction);
+	return uv * rcp(CubeMapMajorAxis(direction)) + 0.5;
 }
 
 float4 AlphaPremultiply(float4 value)
@@ -172,9 +189,10 @@ uint2 Exp2Pow2(uint2 a) { return 1u << a; }
 uint3 Exp2Pow2(uint3 a) { return 1u << a; }
 uint4 Exp2Pow2(uint4 a) { return 1u << a; }
 
-uint BitOr(uint2 x) { return x.x | x.y; }
-uint BitOr(uint3 x) { return x.x | BitOr(x.yz); }
-uint BitOr(uint4 x) { return x.x | BitOr(x.yzw); }
+uint BitFieldMask(uint width, uint offset)
+{
+	return (Exp2Pow2(width) - 1u) << offset;
+}
 
 bool Checker(float2 position)
 {

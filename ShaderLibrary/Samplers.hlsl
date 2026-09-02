@@ -3,7 +3,7 @@
 
 SamplerState PointClampSampler, PointRepeatSampler, LinearClampSampler, LinearRepeatSampler, TrilinearClampSampler, TrilinearClampAniso4Sampler, TrilinearClampAniso8Sampler, TrilinearClampAniso16Sampler, TrilinearRepeatSampler, TrilinearRepeatAniso4Sampler, TrilinearRepeatAniso8Sampler, TrilinearRepeatAniso16Sampler;
 
-SamplerComparisonState LinearClampCompareSampler, PointClampCompareSampler;
+SamplerComparisonState PointClampCompareSampler, LinearClampCompareSampler, PointRepeatCompareSampler, LinearRepeatCompareSampler;
 
 const static SamplerState SurfaceSampler = TrilinearRepeatAniso4Sampler;
 
