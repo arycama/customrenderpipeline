@@ -189,6 +189,10 @@ uint2 Exp2Pow2(uint2 a) { return 1u << a; }
 uint3 Exp2Pow2(uint3 a) { return 1u << a; }
 uint4 Exp2Pow2(uint4 a) { return 1u << a; }
 
+uint BitOr(uint2 x) { return x.x | x.y; }
+uint BitOr(uint3 x) { return x.x | BitOr(x.yz); }
+uint BitOr(uint4 x) { return x.x | BitOr(x.yzw); }
+
 uint BitFieldMask(uint width, uint offset)
 {
 	return (Exp2Pow2(width) - 1u) << offset;
