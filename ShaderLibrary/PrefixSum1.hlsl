@@ -3,13 +3,13 @@
 // Note that a GroupMemoryBarrierWithGroupSync may be required. This is left out incase the caller does not require it.
 void PrefixSumSharedWrite(uint index, uint data); // array[index] = data
 uint PrefixSumSharedRead(uint index); // return array[index];
-void PrefixSumOutputTotalCount(uint data);
+void PrefixSumOutputTotalCount(uint data, uint groupId);
 
 #define NUM_BANKS 16
 #define LOG_NUM_BANKS 4
 #define CONFLICT_FREE_OFFSET(n)((n) >> NUM_BANKS + (n) >> (2 * LOG_NUM_BANKS))
 
-void PrefixSum(uint groupIndex, uint size)
+void PrefixSum(uint groupIndex, uint size, uint groupId)
 {
 	uint offset = 1;
 	
@@ -34,7 +34,7 @@ void PrefixSum(uint groupIndex, uint size)
 	// C: clear the last element
 	if (!groupIndex)
 	{
-		PrefixSumOutputTotalCount(PrefixSumSharedRead(size - 1));
+		PrefixSumOutputTotalCount(PrefixSumSharedRead(size - 1), groupId);
 		PrefixSumSharedWrite(size - 1, 0);
 	}
 	

@@ -23,11 +23,11 @@ uint PrefixSumSharedRead(uint index)
 	return sharedSums[index];
 }
 
-void PrefixSumOutputTotalCount(uint totalSum)
+void PrefixSumOutputTotalCount(uint totalSum, uint groupId)
 {
 	#ifdef WRITE_FINAL_COUNT
-		GroupSumsWrite[GroupId] = totalSum;
-	#endif
+		GroupSumsWrite[groupId] = totalSum;
+#endif
 
 	#ifdef WRITE_DRAW_CALL_COUNT
 		TotalInstanceCount[0] = totalSum;
@@ -37,12 +37,10 @@ void PrefixSumOutputTotalCount(uint totalSum)
 [numthreads(threadCount, 1, 1)]
 void KERNEL(uint dispatchThreadId : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint groupId : SV_GroupID)
 {
-	GroupId = groupId;
-
 	// Load input into shared memory
 	sharedSums[groupIndex] = dispatchThreadId < MaxThread ? Input[dispatchThreadId] : 0;
 
-	PrefixSum(groupIndex, threadCount);
+	PrefixSum(groupIndex, threadCount, groupId);
 	
 	GroupMemoryBarrierWithGroupSync();
 	
