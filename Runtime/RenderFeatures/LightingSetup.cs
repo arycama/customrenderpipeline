@@ -15,8 +15,8 @@ namespace CustomRenderPipeline
     public partial class LightingSetup : ViewRenderFeature
     {
         private readonly LightingSettings settings;
-        private readonly NativeList<LightShadowCasterCullingInfo> perLightInfos = new(1, Allocator.Persistent);
-        private readonly NativeList<ShadowSplitData> splitBuffer = new(1, Allocator.Persistent);
+        private readonly ResizableArray<LightShadowCasterCullingInfo> perLightInfos = new();
+        private readonly ResizableArray<ShadowSplitData> splitBuffer = new();
         private readonly LightCulling.Settings lightCulling;
 
         private LightData[] pointLights = new LightData[8];
@@ -27,12 +27,6 @@ namespace CustomRenderPipeline
         {
             this.settings = settings;
             this.lightCulling = lightCulling;
-        }
-
-        protected override void Cleanup(bool disposing)
-        {
-            perLightInfos.Dispose();
-            splitBuffer.Dispose();
         }
 
         public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
@@ -120,7 +114,7 @@ namespace CustomRenderPipeline
                             return L * Exp2(M * x) + N;
                         }
 
-                        splitRange = new RangeInt(splitBuffer.Length, settings.DirectionalCascadeCount);
+                        splitRange = new RangeInt(splitBuffer.Count, settings.DirectionalCascadeCount);
                         for (var j = 0; j < settings.DirectionalCascadeCount; j++)
                         {
                             // Transform camera split bounds to light space
@@ -159,7 +153,7 @@ namespace CustomRenderPipeline
                     if (visibleLight.lightType == LightType.Point)
                     {
                         shadowIndex = (uint)pointShadowRequests.Count;
-                        splitRange = new RangeInt(splitBuffer.Length, 6);
+                        splitRange = new RangeInt(splitBuffer.Count, 6);
 
                         for (var j = 0; j < 6; j++)
                         {
@@ -195,7 +189,7 @@ namespace CustomRenderPipeline
                         var shadowRequest = new ShadowRequest(i, worldToView, viewToClip, shadowSplitData, -1, lightPosition, hasShadowBounds, light.shadowNearPlane, light.range, lightPosition, lightRotation, light.spotAngle, size.x / size.y, settings.SpotShadowResolution);
                         spotShadowRequests.Add(shadowRequest);
 
-                        splitRange = new RangeInt(splitBuffer.Length, 1);
+                        splitRange = new RangeInt(splitBuffer.Count, 1);
                         splitBuffer.Add(shadowSplitData);
                     }
                 }
@@ -275,8 +269,8 @@ namespace CustomRenderPipeline
 
             var infos = new ShadowCastersCullingInfos()
             {
-                perLightInfos = perLightInfos.AsArray(),
-                splitBuffer = splitBuffer.AsArray()
+                perLightInfos = perLightInfos.AsSpan().AsArray(),
+                splitBuffer = splitBuffer.AsSpan().AsArray()
             };
 
             context.CullShadowCasters(cullingResults, infos);

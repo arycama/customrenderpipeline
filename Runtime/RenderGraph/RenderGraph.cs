@@ -34,15 +34,15 @@ namespace CustomRenderPipeline
         private int antiAliasing = 1;
         public bool isScreenPass = false;
 
-        private NativeList<AttachmentData> inputs = new(8, Allocator.Persistent), outputs = new(8, Allocator.Persistent);
+        private readonly ResizableArray<AttachmentData> inputs = new(), outputs = new();
         private SubPassFlags flags;
 
         private int startPassIndex, endPassIndex;
 
-        private readonly NativeList<AttachmentData> attachments = new(8, Allocator.Persistent);
-        private readonly NativeList<SubPassDescriptor> subPasses = new(Allocator.Persistent);
+        private readonly ResizableArray<AttachmentData> attachments = new();
+        private readonly ResizableArray<SubPassDescriptor> subPasses = new();
         private readonly List<RenderPassDescriptor> renderPassDescriptors = new();
-        private readonly NativeList<AttachmentDescriptor> passAttachments = new(8, Allocator.Persistent);
+        private readonly ResizableArray<AttachmentDescriptor> passAttachments = new();
 
         private RenderPass previousPass, currentPass;
 
@@ -113,9 +113,6 @@ namespace CustomRenderPipeline
             RtHandleSystem.Dispose();
             BufferHandleSystem.Dispose();
 
-            inputs.Dispose();
-            outputs.Dispose();
-
             disposedValue = true;
         }
 
@@ -176,7 +173,7 @@ namespace CustomRenderPipeline
                         var inputCount = currentPass.frameBufferInputs.Count;
                         var outputCount = currentPass.OutputsToCameraTarget ? 1 : currentPass.colorTargets.Count;
 
-                        var canMergeSubPass = !currentPass.ForceNewSubPass && subPasses.Length < 8 && currentPass.flags == flags && inputCount == inputs.Length && outputCount == outputs.Length;
+                        var canMergeSubPass = !currentPass.ForceNewSubPass && subPasses.Count < 8 && currentPass.flags == flags && inputCount == inputs.Count && outputCount == outputs.Count;
                         if (canMergeSubPass)
                         {
                             // Check if all the inputs and outputs are equal (And in identical order) since this must be true for the pass to merge
@@ -333,7 +330,7 @@ namespace CustomRenderPipeline
             {
                 var input = subPassDepth.Value;
                 var index = -1;
-                for (var j = 0; j < attachments.Length; j++)
+                for (var j = 0; j < attachments.Count; j++)
                     if (attachments[j].handle == input.handle)
                     {
                         index = j;
@@ -342,20 +339,20 @@ namespace CustomRenderPipeline
 
                 if (index == -1)
                 {
-                    index = attachments.Length;
+                    index = attachments.Count;
                     attachments.Add(input);
                 }
 
                 depthIndex = index;
             }
 
-            var subPassInputs = new AttachmentIndexArray(inputs.Length);
+            var subPassInputs = new AttachmentIndexArray(inputs.Count);
             {
-                for (var i = 0; i < inputs.Length; i++)
+                for (var i = 0; i < inputs.Count; i++)
                 {
                     var input = inputs[i];
                     var index = -1;
-                    for (var j = 0; j < attachments.Length; j++)
+                    for (var j = 0; j < attachments.Count; j++)
                         if (attachments[j].handle == input.handle)
                         {
                             index = j;
@@ -364,7 +361,7 @@ namespace CustomRenderPipeline
 
                     if (index == -1)
                     {
-                        index = attachments.Length;
+                        index = attachments.Count;
                         attachments.Add(input);
                     }
 
@@ -372,14 +369,14 @@ namespace CustomRenderPipeline
                 }
             }
 
-            var subPassOutputs = new AttachmentIndexArray(outputs.Length);
+            var subPassOutputs = new AttachmentIndexArray(outputs.Count);
             {
                 // Find the index of each output in the existing attachments array if it exists
-                for (var i = 0; i < outputs.Length; i++)
+                for (var i = 0; i < outputs.Count; i++)
                 {
                     var output = outputs[i];
                     var index = -1;
-                    for (var j = 0; j < attachments.Length; j++)
+                    for (var j = 0; j < attachments.Count; j++)
                     {
                         var attachment = attachments[j];
 
@@ -405,7 +402,7 @@ namespace CustomRenderPipeline
 
                     if (index == -1)
                     {
-                        index = attachments.Length;
+                        index = attachments.Count;
                         attachments.Add(output);
                     }
 
@@ -432,7 +429,7 @@ namespace CustomRenderPipeline
 
             endPassIndex = pass.Index;
             isInRenderPass = false;
-            renderPassDescriptors.Add(new(currentNativeRenderPassSize, new(attachments.AsArray(), Allocator.Temp), new(subPasses.AsArray(), Allocator.Temp), startPassIndex, endPassIndex, pass.ViewCount, antiAliasing, depthIndex, -1, mipLevel, isScreenPass, passName));
+            renderPassDescriptors.Add(new(currentNativeRenderPassSize, new(attachments.AsSpan().AsArray(), Allocator.Temp), new(subPasses.AsSpan().AsArray(), Allocator.Temp), startPassIndex, endPassIndex, pass.ViewCount, antiAliasing, depthIndex, -1, mipLevel, isScreenPass, passName));
             attachments.Clear();
             subPasses.Clear();
             passName = null;
@@ -572,13 +569,13 @@ namespace CustomRenderPipeline
                         _ = Encoding.UTF8.GetBytes(descriptor.debugName, debugNameUtf8);
 
                         var size = descriptor.isScreenPass ? RtHandleSystem.ScreenSize : descriptor.size;
-                        command.BeginRenderPass(size.x, size.y, descriptor.viewCount, descriptor.antiAliasing, passAttachments.AsArray(), descriptor.depthAttachmentIndex, descriptor.shadingRateImageAttachmentIndex, descriptor.subpasses, debugNameUtf8);
+                        command.BeginRenderPass(size.x, size.y, descriptor.viewCount, descriptor.antiAliasing, passAttachments.AsSpan().AsArray(), descriptor.depthAttachmentIndex, descriptor.shadingRateImageAttachmentIndex, descriptor.subpasses, debugNameUtf8);
 
                         // We disable Unity's annoying internal Y flip, but it will still attempt to flip any viewports we set, so we need to negate the viewport to undo Unity's negation
                         // However if the target is only a depth buffer, Unity will not flip it
                         var viewport = new Rect(0, 0, descriptor.size.x >> descriptor.mipLevel, descriptor.size.y >> descriptor.mipLevel);
 
-                        if (passAttachments.Length != 1 || descriptor.depthAttachmentIndex == -1)
+                        if (passAttachments.Count != 1 || descriptor.depthAttachmentIndex == -1)
                             viewport = GraphicsUtilities.NonFlippedViewport(viewport, size);
 
                         command.SetViewport(viewport);

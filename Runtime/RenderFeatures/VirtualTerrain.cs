@@ -19,7 +19,7 @@ namespace CustomRenderPipeline
         private readonly Texture2DArray albedoSmoothnessTexture, normalTexture, heightTexture;
         private readonly ComputeShader virtualTextureUpdate, dxtCompress;
         private readonly LruCache<int, int> lruCache = new();
-        private readonly NativeList<int> pendingRequests = new(Allocator.Persistent);
+        private readonly ResizableArray<int> pendingRequests = new();
         private readonly HashSet<int> queuedRequests = new();
         private readonly Material virtualTextureBuildMaterial;
 
@@ -82,8 +82,6 @@ namespace CustomRenderPipeline
             renderGraph.ReleasePersistentResource(mappedTiles, -1);
             renderGraph.ReleasePersistentResource(feedbackBuffer, -1);
             renderGraph.ReleasePersistentResource(pageTable, -1);
-
-            pendingRequests.Dispose();
 
             Object.DestroyImmediate(albedoSmoothnessTexture);
             Object.DestroyImmediate(normalTexture);
@@ -160,7 +158,7 @@ namespace CustomRenderPipeline
             }
 
             queuedRequests.Clear();
-            foreach (var packedPosition in pendingRequests)
+            foreach (var packedPosition in pendingRequests.AsSpan())
             {
                 var position = UnpackCoord(packedPosition);
 
