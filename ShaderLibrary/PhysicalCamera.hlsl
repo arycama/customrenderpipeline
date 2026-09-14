@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Common.hlsl"
 #include "Math.hlsl"
 
 const static float Sensitivity = 100.0; // K
