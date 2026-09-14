@@ -47,7 +47,7 @@ cbuffer PointLightData
 	uint TileCountX;
 	uint LightIndexCount;
 	
-	uint LightCullDepthSlices;
+	uint MaxLightBinIndex;
 	float LightBinWidth;
 	float RcpTileSize;
 	float RcpBinWidth;
