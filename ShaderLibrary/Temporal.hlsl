@@ -1,7 +1,6 @@
 #ifndef TEMPORAL_INCLUDED
 #define TEMPORAL_INCLUDED
 
-#include "Common.hlsl"
 #include "Color.hlsl"
 #include "Exposure.hlsl"
 #include "SpaceTransforms.hlsl"

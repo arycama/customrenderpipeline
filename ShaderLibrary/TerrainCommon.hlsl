@@ -1,13 +1,11 @@
 #ifndef TERRAIN_COMMON_INCLUDED
 #define TERRAIN_COMMON_INCLUDED
 
-#include "Common.hlsl"
 #include "Geometry.hlsl"
 #include "Material.hlsl"
 #include "Packing.hlsl"
 #include "Samplers.hlsl"
 #include "Utility.hlsl"
-
 
 StructuredBuffer<uint> TerrainLayerData;
 Texture2DArray<float1> Mask;
@@ -25,6 +23,7 @@ cbuffer TerrainFrameData
 	float TerrainHeightScale;
 	float TerrainHeightmapResolution;
 	float TerrainHeightExtents;
+	float3 TerrainFrameDataPadding;
 };
 
 cbuffer TerrainViewData
@@ -32,6 +31,7 @@ cbuffer TerrainViewData
 	float4 WorldToTerrainHalfTexel;
 	float4 WorldToTerrain;
 	float TerrainHeightOffset;
+	float3 TerrainViewDataPadding;
 };
 
 float GetTerrainHeight(float2 uv, float2 dx, float2 dy)
