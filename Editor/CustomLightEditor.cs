@@ -1056,7 +1056,7 @@ namespace CustomRenderPipeline
             // Need to disable this for now until we get all the inner angle baking working.
             if (innerAngle > 0f && drawInnerConeAngle)
             {
-                DrawHandleDirections = HandleDirections.Up | HandleDirections.Down;
+                DrawHandleDirections = HandleDirections.All;
                 var innerDiscRadius = range * Mathf.Sin(innerAngle * Mathf.Deg2Rad * 0.5f);
                 var innerDiscDistance = Mathf.Cos(Mathf.Deg2Rad * innerAngle * 0.5f) * range;
 
@@ -1073,7 +1073,7 @@ namespace CustomRenderPipeline
             // Drawing the outer Cone and also z-testing it to draw another color if behind
             Handles.color = outerColor;
 
-            DrawHandleDirections = HandleDirections.Left | HandleDirections.Right;
+            DrawHandleDirections = HandleDirections.All;
             DrawConeWireframe(outerDiscRadius, outerDiscDistance, DrawHandleDirections);
 
             // Bottom arcs, making a nice rounded shape
