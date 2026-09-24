@@ -2,11 +2,6 @@ Shader "Hidden/Physical Sky Tables"
 {
     SubShader
     {
-        Cull Off
-        ZClip Off
-        ZTest Off
-        ZWrite Off
-
 		HLSLINCLUDE
 		#pragma use_dxc
 		#pragma require waveMath

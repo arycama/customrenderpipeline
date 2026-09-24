@@ -26,8 +26,7 @@ float MurkyPhase(float cosTheta)
 
 float SchlickPhase(float cosTheta, float g)
 {
-	g = 1.55 * g - 0.55 * pow(g, 3.0); // This simply remaps g to be closer to hg, could prebake into material
-	return RcpFourPi * (1.0 - Sq(g)) * rcp(Sq(1.0 - g * cosTheta));
+	return (1.0 - Sq(g)) * rcp(FourPi * Sq(1.0 - g * cosTheta));
 }
 
 float HgPhase(float cosTheta, float g)

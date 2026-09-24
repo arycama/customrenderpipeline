@@ -1,9 +1,9 @@
 #include "../../Atmosphere.hlsl"
-#include "../../Common.hlsl"
 #include "../../CommonShaders.hlsl"
-#include "../../Lighting.hlsl"
+//#include "../../Lighting.hlsl"
 
-float _Samples;
+float _Samples, ViewHeight;
+float3 _LightDirection0;
 float4 TransmittanceScaleOffset, ViewTransmittanceScaleOffset, SkyLuminanceScaleOffset, CdfScaleOffset, TransmittanceDepthScaleOffset;
 
 float3 FragmentTransmittanceLut(VertexFullscreenTriangleMinimalOutput input) : SV_Target

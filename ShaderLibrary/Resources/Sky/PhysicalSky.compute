@@ -48,7 +48,7 @@ void KERNEL(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 	
 	bool rayIntersectsGround = RayIntersectsGround(viewHeight, V.z);
 	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, V.y, rayIntersectsGround);
-	AtmosphereResult result = SampleAtmosphere(viewHeight, V.y, lightCosAngle, dot(L, V), _Samples, rayLength, applyMultiScatter, true, rayIntersectsGround);
+	AtmosphereResult result = SampleAtmosphere(viewHeight, V.y, lightCosAngle, dot(L, V), _Samples, rayLength, applyMultiScatter, false, rayIntersectsGround);
 	ScatterShared[groupIndex] = result.luminance / _ThreadCount;
 	MultiScatterShared[groupIndex] = result.density / _ThreadCount;
 	

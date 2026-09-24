@@ -3,7 +3,6 @@
 
 #include "Color.hlsl"
 #include "Geometry.hlsl"
-#include "Material.hlsl" 
 #include "Samplers.hlsl" 
 #include "Volumetrics.hlsl" 
 
@@ -32,20 +31,22 @@ cbuffer AtmosphereProperties
 	float SqMaxAtmosphereDistance;
 	float RcpMaxHorizonDistance;
 	float MaxHorizonDistance;
+	
+	float4 SkyTransmittanceRemap;
+	float4 _MultiScatterRemap;
+	float4 _SkyAmbientRemap;
+	
+	float2 _GroundAmbientRemap;
+	float2 AtmospherePropertiesPadding0;
 };
 
 Texture2D<float3> SkyTransmittance;
 Texture2D<float3> _MultiScatter;
-float4 SkyTransmittanceRemap, _MultiScatterRemap;
-float4 SkyLuminanceRemap;
-
-float2 _GroundAmbientRemap;
 Texture2D<float3> _GroundAmbient;
-
 Texture2D<float3> _SkyAmbient;
-float4 _SkyAmbientRemap;
-
 Texture2DArray<float> SkyCdf;
+
+float4 SkyLuminanceRemap;
 float4 SkyCdfRemap;
 
 Texture3D<float> _AtmosphereDepth;
