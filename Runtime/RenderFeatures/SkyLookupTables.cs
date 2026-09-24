@@ -81,6 +81,8 @@ namespace CustomRenderPipeline
                 GraphicsUtilities.HalfTexelRemap(settings.TransmittanceWidth, settings.TransmittanceHeight),
                 GraphicsUtilities.HalfTexelRemap(settings.MultiScatterWidth, settings.MultiScatterHeight),
                 GraphicsUtilities.HalfTexelRemap(settings.AmbientSkyWidth, settings.AmbientSkyHeight),
+                GraphicsUtilities.HalfTexelRemap(settings.LuminanceWidth, settings.LuminanceHeight),
+                GraphicsUtilities.HalfTexelRemap(settings.CdfWidth, settings.CdfHeight),
                 GraphicsUtilities.HalfTexelRemap(settings.AmbientGroundWidth), 0, 0
             ));
 

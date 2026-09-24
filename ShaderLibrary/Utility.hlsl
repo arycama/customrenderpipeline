@@ -13,6 +13,10 @@ bool3 select(bool3 c, float3 a, float3 b) { return c ? a : b; }
 bool4 select(bool4 c, float4 a, float4 b) { return c ? a : b; }
 #endif
 
+float Select(float2 v, uint index) { return index ? v.y : v.x; }
+float Select(float3 v, uint index) { return index ? (index == 2 ? v.z : v.y) : v.x; }
+float Select(float4 v, uint index) { return index ? (index == 3 ? v.w : (index == 2 ? v.z : v.y)) : v.x; }
+
 float FastSign(float x) { return select(x >= 0.0, 1.0, -1.0); };
 float2 FastSign(float2 x) { return select(x >= 0.0, 1.0, -1.0); };
 float3 FastSign(float3 x) { return select(x >= 0.0, 1.0, -1.0); };

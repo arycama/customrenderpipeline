@@ -123,7 +123,7 @@ namespace CustomRenderPipeline
             }
 
             var cdfRemap = GraphicsUtilities.HalfTexelRemap(settings.CdfWidth, settings.CdfHeight);
-            renderGraph.SetResource(new SkyReflectionAmbientData(cdf, skyViewLuminance, weightedDepth, skyLuminanceRemap, cdfRemap));
+            renderGraph.SetResource(new SkyReflectionAmbientData(cdf, skyViewLuminance, weightedDepth));
             renderGraph.AddProfileEndPass("Sky Precompute");
         }
     }

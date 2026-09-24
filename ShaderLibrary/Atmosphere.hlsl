@@ -35,6 +35,8 @@ cbuffer AtmosphereProperties
 	float4 SkyTransmittanceRemap;
 	float4 _MultiScatterRemap;
 	float4 _SkyAmbientRemap;
+	float4 SkyLuminanceRemap;
+	float4 SkyCdfRemap;
 	
 	float2 _GroundAmbientRemap;
 	float2 AtmospherePropertiesPadding0;
@@ -45,10 +47,6 @@ Texture2D<float3> _MultiScatter;
 Texture2D<float3> _GroundAmbient;
 Texture2D<float3> _SkyAmbient;
 Texture2DArray<float> SkyCdf;
-
-float4 SkyLuminanceRemap;
-float4 SkyCdfRemap;
-
 Texture3D<float> _AtmosphereDepth;
 Texture2D<float3> _MiePhaseTexture;
 Texture2DArray<float3> SkyLuminance;
