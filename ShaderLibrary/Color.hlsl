@@ -120,17 +120,29 @@ float StandardIlluminantY(float x)
 
 float2 ColorTemperatureToXy(float temp, float tint = 0.5)
 {
-	float x, y;
-    
-	if (temp <= 4000.0)
-		x = 0.27475e9 / (temp * temp * temp) - 0.98598e6 / (temp * temp) + 1.17444e3 / temp + 0.145986;
-	else if (temp <= 7000.0)
-		x = -4.6070e9 / (temp * temp * temp) + 2.9678e6 / (temp * temp) + 0.09911e3 / temp + 0.244063;
-	else
-		x = -2.0064e9 / (temp * temp * temp) + 1.9018e6 / (temp * temp) + 0.24748e3 / temp + 0.237040;
-    
-	y = StandardIlluminantY(x) + Remap(tint, 0.0, 1.0, -0.1, 0.1);
+	float x = temp <= 7000 ? 0.244063 + (0.09911e3 + (2.9678e6 - 4.6070e9 / temp) / temp) / temp : 0.237040 + (0.24748e3 + (1.9018e6 - 2.0064e9 / temp) / temp) / temp;
+	float y = StandardIlluminantY(x) + Remap(tint, 0.0, 1.0, -0.1, 0.1);
 	return float2(x, y);
+}
+
+float XyToColorTemperature(float x, float y)
+{
+	// Hernandez-Andres et al. (1999) CCT from CIE xy chromaticity.
+	float n = (x - 0.3366) / (y - 0.1735);
+	float cct = -949.86315 + 6253.80338 * exp(-n / 0.92159) + 28.70599 * exp(-n / 0.20039) + 0.00004 * exp(-n / 0.07125);
+
+	#if 0
+    // Above 50000K, use the alternate fit (daylight branch).
+	if (cct > 50000.0)
+	{
+		n = (x - 0.3356) / (y - 0.1691);
+		cct = 36284.48953
+            + 0.00228 * exp(-n / 0.07861)
+            + 5.4535e-36 * exp(-n / 0.01543);
+	}
+	#endif
+	
+	return cct;
 }
 
 float3 LMSToXYZ(float3 c)
