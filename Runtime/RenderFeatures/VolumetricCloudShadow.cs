@@ -107,7 +107,7 @@ namespace CustomRenderPipeline
             var viewMatrix = Matrix4x4.Rotate(worldToLight);
             var invViewMatrix = Matrix4x4.Rotate(lightRotation);
 
-            var projectionMatrix = Float4x4.OrthoOffCenterNormalized(minValue.x, maxValue.x, minValue.y, maxValue.y, minValue.z, maxValue.z);
+            var projectionMatrix = Float4x4.OrthoReverseZSample(minValue.x, maxValue.x, maxValue.y, minValue.y, maxValue.z, minValue.z);
             var inverseProjectionMatrix = new Matrix4x4
             {
                 m00 = 1.0f / settings.ShadowResolution * (maxValue.x - minValue.x),
