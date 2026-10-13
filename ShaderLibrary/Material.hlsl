@@ -287,18 +287,6 @@ float2 ParallaxUv(float3 uv, float3 rayDirection, float scale, Texture2DArray<fl
 	return dist * rayDirection.xy + uv.xy;
 }
 
-float4 BilinearWeights(float2 localUv)
-{
-	float4 weights = localUv.xxyy * float4(-1, 1, 1, -1) + float4(1, 0, 0, 1);
-	return weights.zzww * weights.xyyx;
-}
-
-float4 BilinearWeights(float2 uv, float2 textureSize)
-{
-	float2 localUv = frac(uv * textureSize - 0.5 + rcp(512.0));
-	return BilinearWeights(localUv);
-}
-
 float LengthToRoughness(float len)
 {
 	len = saturate(Remap(len, 2.0 / 3.0, 1.0));
