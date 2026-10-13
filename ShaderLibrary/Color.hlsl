@@ -378,6 +378,14 @@ float3 ICtCpToRec709(float3 iCtCp)
 	return Rec2020ToRec709(rec2020);
 }
 
+float3 OffsetICtCpToRec709(float3 iCtCpOffset)
+{
+	float3 iCtCp = iCtCpOffset - float2(0.0, 0.5).xyy;
+	float3 pqLms = ICtCpToLMS(iCtCp);
+	float3 lms = ST2084ToLinear(pqLms);
+	return Rec2020ToRec709(LMSToRec2020(lms));
+}
+
 // To gamma-sRGB
 float3 LinearToGamma(float3 c)
 {
@@ -455,6 +463,13 @@ half3 Rec709ToICtCp(half3 rec709)
 {
 	half3 rec2020 = Rec709ToRec2020(rec709);
 	return Rec2020ToICtCp(rec2020);
+}
+
+half3 Rec709ToOffsetICtCp(half3 rec709)
+{
+	float3 iCtCp = Rec709ToICtCp(rec709);
+	iCtCp.yz += 0.5;
+	return iCtCp;
 }
 
 half3 RgbToYCbCr(half3 rgb)
