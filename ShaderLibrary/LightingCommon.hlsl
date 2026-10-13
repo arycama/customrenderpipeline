@@ -47,10 +47,10 @@ cbuffer PointLightData
 	uint TileCountX;
 	uint LightIndexCount;
 	
-	uint MaxLightBinIndex;
-	float LightBinWidth;
-	float RcpTileSize;
-	float RcpBinWidth;
+	half MaxLightBinIndex;
+	half LightBinWidth;
+	half RcpTileSize;
+	half RcpBinWidth;
 };
 
 StructuredBuffer<Light> PointLights;
