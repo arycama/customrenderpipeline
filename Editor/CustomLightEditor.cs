@@ -117,6 +117,8 @@ namespace CustomRenderPipeline
                 _ = EditorGUILayout.PropertyField(settings.areaSizeY);
             }
 
+            settings.DrawRenderingLayerMask();
+
             _ = serializedObject.ApplyModifiedProperties();
         }
 
