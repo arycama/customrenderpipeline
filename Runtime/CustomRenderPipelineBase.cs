@@ -240,7 +240,7 @@ namespace CustomRenderPipeline
                             for (var k = 0; k < viewCount; k++)
                             {
                                 renderPass.GetRenderParameter(camera, k, out var renderParameter);
-                                AddViewParameter(new(renderParameter.view, renderParameter.projection));
+                                AddViewParameter(new(renderParameter.view, renderParameter.projection, renderParameter.occlusionMesh, renderParameter.visibleMesh));
                             }
                         }
                     }
@@ -262,7 +262,7 @@ namespace CustomRenderPipeline
 
                     var displayRenderPass = GetDisplayRenderPass(0, 1, isFlipped, size, target, format, VRTextureUsage.None, cullingParameters, -6, IntPtr.Zero);
                     viewPassDatas.Add(displayRenderPass);
-                    AddViewParameter(new(camera.worldToCameraMatrix, camera.projectionMatrix));
+                    AddViewParameter(new(camera.worldToCameraMatrix, camera.projectionMatrix, null, null));
                 }
 
 #if UNITY_EDITOR
