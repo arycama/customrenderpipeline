@@ -153,7 +153,7 @@ namespace CustomRenderPipeline
                         // We allow some subpasses to have no depth attachment, by setting the flags to readonlydepthstencil
                         if (!currentPass.depthBuffer.HasValue)
                         {
-                            currentPass.flags = SubPassFlags.ReadOnlyDepthStencil;
+                            currentPass.flags |= SubPassFlags.ReadOnlyDepthStencil;
                         }
 
                         if (depthIndex != -1 && currentPass.depthBuffer.HasValue)

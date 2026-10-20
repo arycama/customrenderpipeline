@@ -29,7 +29,7 @@ namespace CustomRenderPipeline
         public void WriteRtHandleDepth<K>(SubPassFlags flags = SubPassFlags.None) where K : IRtHandleId
         {
             var handle = RenderGraph.GetRtHandleData<K>().handle;
-            this.flags = flags;
+            this.flags |= flags;
             depthBuffer = handle;
             WriteResource(handle);
 
@@ -46,7 +46,7 @@ namespace CustomRenderPipeline
 
         public void WriteDepth(ResourceHandle<RenderTexture> rtHandle, SubPassFlags flags = SubPassFlags.None)
         {
-            this.flags = flags;
+            this.flags |= flags;
             depthBuffer = rtHandle;
             WriteResource(rtHandle);
 
