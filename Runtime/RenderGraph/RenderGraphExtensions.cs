@@ -26,6 +26,7 @@ namespace CustomRenderPipeline
         public static ObjectScreenRenderPass<T> AddObjectScreenRenderPass<T>(this RenderGraph renderGraph, string name, T data) => renderGraph.AddRenderPass<ObjectScreenRenderPass<T>, T>(name, data);
         public static RaytracingRenderPass<T> AddRaytracingRenderPass<T>(this RenderGraph renderGraph, string name, T data) => renderGraph.AddRenderPass<RaytracingRenderPass<T>, T>(name, data);
         public static ShadowRenderPass<T> AddShadowRenderPass<T>(this RenderGraph renderGraph, string name, T data) => renderGraph.AddRenderPass<ShadowRenderPass<T>, T>(name, data);
+        public static DrawMeshRenderPass<T> AddDrawMeshRenderPass<T>(this RenderGraph renderGraph, string name, T data) => renderGraph.AddRenderPass<DrawMeshRenderPass<T>, T>(name, data);
 
         // Defaults (Still need a type to avoid unneccessary class variants)
         public static BlitToScreenPass<int> AddBlitToScreenPass(this RenderGraph renderGraph, string name) => AddBlitToScreenPass(renderGraph, name, 0);
@@ -43,6 +44,7 @@ namespace CustomRenderPipeline
         public static ObjectScreenRenderPass<int> AddObjectScreenRenderPass(this RenderGraph renderGraph, string name) => AddObjectScreenRenderPass(renderGraph, name, 0);
         public static RaytracingRenderPass<int> AddRaytracingRenderPass(this RenderGraph renderGraph, string name) => AddRaytracingRenderPass(renderGraph, name, 0);
         public static ShadowRenderPass<int> AddShadowRenderPass(this RenderGraph renderGraph, string name) => AddShadowRenderPass(renderGraph, name, 0);
+        public static DrawMeshRenderPass<int> AddDrawMeshRenderPass(this RenderGraph renderGraph, string name) => AddDrawMeshRenderPass(renderGraph, name, 0);
 
         public static void AddProfileBeginPass(this RenderGraph renderGraph, string name)
         {
