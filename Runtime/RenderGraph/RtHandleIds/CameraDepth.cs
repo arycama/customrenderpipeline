@@ -1,3 +1,6 @@
-﻿public readonly struct CameraDepth : IRtHandleId
+﻿namespace CustomRenderPipeline
 {
+    public readonly struct CameraDepth : IRtHandleId
+    {
+    }
 }
