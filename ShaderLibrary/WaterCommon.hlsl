@@ -2,7 +2,6 @@
 #define WATER_COMMON_INCLUDED
 
 #include "Atmosphere.hlsl"
-#include "Common.hlsl"
 #include "Material.hlsl"
 #include "Geometry.hlsl"
 #include "Samplers.hlsl"
