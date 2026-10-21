@@ -9,8 +9,8 @@
 #include "Utility.hlsl"
 
 // Ior = Index of refraction
-const static half AirIor = 1.0h; // Actually 1.000293, but this is a close enough approximation used in all games and allows some simplifications
-const static half DefaultDielectricIor = 1.5h; // Most dielectrics are around this value, so it is used to calculate the default spec color of 0.04%
+const static half AirIor = 1.0; // Actually 1.000293, but this is a close enough approximation used in all games and allows some simplifications
+const static half DefaultDielectricIor = 1.5; // Most dielectrics are around this value, so it is used to calculate the default spec color of 0.04%
 
 Texture2D<float> _LengthToRoughness;
 
@@ -37,7 +37,7 @@ struct Material
 	bool twoSided;
 };
 
-Material CreateMaterial(half3 albedo = 1.0h, half roughness = 1.0h, half3 normal = half3(0.0h, 1.0h, 0.0h), half metallic = 0.0h, half occlusion = 1.0h, half opacity = 1.0h, half3 emission = 0.0h, bool hasMetallic = false, bool isBackface = false, half ior = 1.5h, bool applyUnderwaterFog = true, bool refractedEnvironment = false, half translucency = 0.0h, bool isFade = false, half3 bentNormal = half3(0.0h, 1.0h, 0.0h), half alphaThreshold = 0.5, bool alphaClip = false, bool twoSided = false)
+Material CreateMaterial(half3 albedo = 1.0, half roughness = 1.0, half3 normal = half3(0.0, 1.0, 0.0), half metallic = 0.0, half occlusion = 1.0, half opacity = 1.0, half3 emission = 0.0, bool hasMetallic = false, bool isBackface = false, half ior = 1.5, bool applyUnderwaterFog = true, bool refractedEnvironment = false, half translucency = 0.0, bool isFade = false, half3 bentNormal = half3(0.0, 1.0, 0.0), half alphaThreshold = 0.5, bool alphaClip = false, bool twoSided = false)
 {
 	Material material;
 	material.albedo = albedo;
@@ -69,47 +69,47 @@ half3 IorToReflectivity(half3 destIor, half3 srcIor = AirIor)
 half3 ReflectivityToIor(half3 reflectivity, half3 srcIor = AirIor)
 {
 	half3 r = rsqrt(abs(reflectivity));
-	return (r * srcIor + srcIor) * rcp(r - 1.0h);
+	return (r * srcIor + srcIor) * rcp(r - 1.0);
 }
 
-half3 GetReflectivity(half3 color, half metallic, half opacity = 1.0h, half3 destIor = DefaultDielectricIor, half3 srcIor = AirIor)
+half3 GetReflectivity(half3 color, half metallic, half opacity = 1.0, half3 destIor = DefaultDielectricIor, half3 srcIor = AirIor)
 {
 	return lerp(IorToReflectivity(destIor, srcIor), color, metallic * opacity);
 }
 
-half3 GetAlbedo(half3 color, half metallic, half opacity = 1.0h)
+half3 GetAlbedo(half3 color, half metallic, half opacity = 1.0)
 {
-	return lerp(color * opacity, 0.0h, metallic);
+	return lerp(color * opacity, 0.0, metallic);
 }
 
 // Returns destIor / srcIor, use for fresnel
 half3 ReflectivityToIorRatio(half3 reflectivity)
 {
 	half3 r = rsqrt(abs(reflectivity));
-	half3 numerator = r + 1.0h;
-	half3 denominator = r - 1.0h;
+	half3 numerator = r + 1.0;
+	half3 denominator = r - 1.0;
 	SignSwap(numerator, denominator, reflectivity);
-	return select(reflectivity, numerator * rcp(denominator), 1.0h);
+	return select(reflectivity, numerator * rcp(denominator), 1.0);
 }
 
 // Returns srcIor / destIor, use for refract
 half3 ReflectivityToRcpIorRatio(half3 reflectivity)
 {
 	half3 r = rsqrt(abs(reflectivity));
-	half3 numerator = r - 1.0h;
-	half3 denominator = r + 1.0h;
+	half3 numerator = r - 1.0;
+	half3 denominator = r + 1.0;
 	SignSwap(numerator, denominator, reflectivity);
-	return select(reflectivity, numerator * rcp(denominator), 1.0h);
+	return select(reflectivity, numerator * rcp(denominator), 1.0);
 }
 
 half SmoothnessToPerceptualRoughness(half smoothness)
 {
-	return 1.0h - smoothness;
+	return 1.0 - smoothness;
 }
 
 half PerceptualRoughnessToSmoothness(half perceptualRoughness)
 {
-	return 1.0h - perceptualRoughness;
+	return 1.0 - perceptualRoughness;
 }
 
 half PerceptualRoughnessToRoughness(half perceptualRoughness)
@@ -133,10 +133,10 @@ half3 GetViewClampedNormal(half3 N, half3 V, out half NdotV)
 	// Due to smoothed normals, interpolation and normal maps, normals can end up pointing away from the view which causes issues with highlights
 	// This rotates the normal towards the view vector so that NdotV is zero, if needed, to avoid issues in the PBR math
 	NdotV = dot(N, V);
-	if (NdotV < 0.0h)
+	if (NdotV < 0.0)
 	{
 		N = (N - NdotV * V) * RcpSinFromCos(NdotV);
-		NdotV = 0.0h;
+		NdotV = 0.0;
 	}
 	
 	return N;
@@ -147,8 +147,8 @@ half SpecularAntiAliasing(half perceptualRoughness, half3 worldNormal)
 	half roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
 	half roughness2 = Sq(roughness);
 
-	half SIGMA2 = 0.15915494h;
-	half KAPPA = 0.18h;
+	half SIGMA2 = 0.15915494;
+	half KAPPA = 0.18;
 	half3 dndu = ddx(worldNormal);
 	half3 dndv = ddy(worldNormal);
 	half kernelRoughness2 = SIGMA2 * (dot(dndu, dndu) + dot(dndv, dndv));

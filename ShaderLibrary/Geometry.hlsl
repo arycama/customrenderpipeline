@@ -383,13 +383,13 @@ float3 IntersectRayPlaneZ(float3 rayOrigin, float3 rayDirection, float planeDist
 	return rayDirection * t + rayOrigin;
 }
 
-half3x3 LocalToTangentMatrix(half3 normal, half3 tangent, half bitangentSign = 1.0h)
+half3x3 LocalToTangentMatrix(half3 normal, half3 tangent, half bitangentSign = 1.0)
 {
 	half3 bitangent = cross(normal, tangent) * bitangentSign;
 	return half3x3(tangent, bitangent, normal);
 }
 
-half3x3 TangentToLocalMatrix(half3 normal, half3 tangent, half bitangentSign = 1.0h)
+half3x3 TangentToLocalMatrix(half3 normal, half3 tangent, half bitangentSign = 1.0)
 {
 	return transpose(LocalToTangentMatrix(normal, tangent, bitangentSign));
 }

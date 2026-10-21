@@ -88,9 +88,9 @@ float2 NormalToOctahedralUv(float3 n)
 
 half2 NormalToOctahedralUv(half3 n)
 {
-	n *= rcp(dot(abs(n), 1.0h));
+	n *= rcp(dot(abs(n), 1.0));
 	half t = saturate(-n.z);
-	return 0.5h * (n.xy + select(n.xy >= 0.0h, t, -t)) + 0.5h;
+	return 0.5 * (n.xy + select(n.xy >= 0.0, t, -t)) + 0.5;
 }
 
 float3 OctahedralUvToNormal(float2 uv)
@@ -104,10 +104,10 @@ float3 OctahedralUvToNormal(float2 uv)
 
 half3 OctahedralUvToNormal(half2 uv)
 {
-	half2 f = 2.0h * uv - 1.0h;
-	half3 n = half3(f, 1.0h - abs(f.x) - abs(f.y));
+	half2 f = 2.0 * uv - 1.0;
+	half3 n = half3(f, 1.0 - abs(f.x) - abs(f.y));
 	half t = saturate(-n.z);
-	n.xy += select(n.xy >= 0.0h, -t, t);
+	n.xy += select(n.xy >= 0.0, -t, t);
 	return normalize(n);
 }
 
@@ -133,11 +133,11 @@ float3 UnpackNormalSNorm(float2 packedNormal, float scale = 1.0)
 	return normal;
 }
 
-half3 UnpackNormalSNorm(half2 packedNormal, half scale = 1.0h)
+half3 UnpackNormalSNorm(half2 packedNormal, half scale = 1.0)
 {
 	half3 normal;
 	normal.xy = packedNormal * scale;
-	normal.z = sqrt(saturate(1.0h - SqrLength(normal.xy)));
+	normal.z = sqrt(saturate(1.0 - SqrLength(normal.xy)));
 	return normal;
 }
 
@@ -147,9 +147,9 @@ float3 UnpackNormalUNorm(float2 packedNormal, float scale = 1.0)
 	return UnpackNormalSNorm(packedNormal, scale);
 }
 
-half3 UnpackNormalUNorm(half2 packedNormal, half scale = 1.0h)
+half3 UnpackNormalUNorm(half2 packedNormal, half scale = 1.0)
 {
-	packedNormal.xy = 2.0h * packedNormal - 1.0h;
+	packedNormal.xy = 2.0 * packedNormal - 1.0;
 	return UnpackNormalSNorm(packedNormal, scale);
 }
 
@@ -167,11 +167,11 @@ float3 UnpackNormalRGBNoScale(float4 packedNormal)
     return packedNormal.rgb * 2.0 - 1.0;
 }
 
-half3 UnpackNormalAG(half4 packedNormal, half scale = 1.0h)
+half3 UnpackNormalAG(half4 packedNormal, half scale = 1.0)
 {
     half3 normal;
-    normal.xy = packedNormal.ag * 2.0h - 1.0h;
-	normal.z = sqrt(saturate(1.0h - dot(normal.xy, normal.xy)));
+    normal.xy = packedNormal.ag * 2.0 - 1.0;
+	normal.z = sqrt(saturate(1.0 - dot(normal.xy, normal.xy)));
 
     // must scale after reconstruction of normal.z which also
     // mirrors UnpackNormalRGB(). This does imply normal is not returned
@@ -185,7 +185,7 @@ half3 UnpackNormalAG(half4 packedNormal, half scale = 1.0h)
 }
 
 // Unpack normal as DXT5nm (1, y, 0, x) or BC5 (x, y, 0, 1)
-half3 UnpackNormalMapRGorAG(half4 packedNormal, half scale = 1.0h)
+half3 UnpackNormalMapRGorAG(half4 packedNormal, half scale = 1.0)
 {
     // Convert to (?, y, 0, x)
     packedNormal.a *= packedNormal.r;
@@ -195,23 +195,23 @@ half3 UnpackNormalMapRGorAG(half4 packedNormal, half scale = 1.0h)
 half3 UnpackNormal(half4 packedNormal)
 {
 	#if defined(UNITY_ASTC_NORMALMAP_ENCODING)
-		return UnpackNormalAG(packedNormal, 1.0h);
+		return UnpackNormalAG(packedNormal, 1.0);
 	#elif defined(UNITY_NO_DXT5nm)
 		return UnpackNormalRGBNoScale(packedNormal);
 	#else
 		// Compiler will optimize the scale away
-		return UnpackNormalMapRGorAG(packedNormal, 1.0h);
+		return UnpackNormalMapRGorAG(packedNormal, 1.0);
 	#endif
 }
 
 half2 UnpackNormalDerivativesSNorm(half2 packedNormal)
 {
-	return packedNormal * rsqrt(saturate(1.0h - SqrLength(packedNormal)));
+	return packedNormal * rsqrt(saturate(1.0 - SqrLength(packedNormal)));
 }
 
 half2 UnpackNormalDerivativesUNorm(half2 packedNormal)
 {
-	return UnpackNormalDerivativesSNorm(2.0h * packedNormal - 1.0h);
+	return UnpackNormalDerivativesSNorm(2.0 * packedNormal - 1.0);
 }
 
 float4 EncodeFloatRGBA(float x)
