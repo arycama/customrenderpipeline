@@ -5,7 +5,7 @@
 #include "Material.hlsl"
 #include "Geometry.hlsl"
 #include "Samplers.hlsl"
-#include "SpaceTransforms.hlsl"
+#include "MatrixUtils.hlsl"
 #include "Water/WaterShoreMask.hlsl"
 #include "Volumetrics.hlsl"
 
