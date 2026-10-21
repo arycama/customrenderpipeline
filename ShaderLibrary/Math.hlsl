@@ -1,10 +1,10 @@
 #ifndef MATH_INCLUDED
 #define MATH_INCLUDED
 
-const static half HalfEps = 4.8828125e-4h;
-const static half HalfMin = 6.103515625e-5h; // 2^-14, the same value for 10, 11 and 16-bit: https://www.khronos.org/opengl/wiki/Small_Float_Formats
-const static half HalfMinSqrt = 0.0078125h; // 2^-7 == sqrt(HALF_MIN), useful for ensuring HALF_MIN after x^2
-const static half HalfMax = 65504.0h;
+const static half HalfEps = 4.8828125e-4;
+const static half HalfMin = 6.103515625e-5; // 2^-14, the same value for 10, 11 and 16-bit: https://www.khronos.org/opengl/wiki/Small_Float_Formats
+const static half HalfMinSqrt = 0.0078125; // 2^-7 == sqrt(HALF_MIN), useful for ensuring HALF_MIN after x^2
+const static half HalfMax = 65504.0;
 
 const static float FloatEps = 5.960464478e-8; // 2^-24, machine epsilon: 1 + EPS = 1 (half of the ULP for 1.0f)
 const static float FloatMin = 1.175494351e-38; // Minimum normalized positive floating-point number
@@ -14,25 +14,15 @@ const static float FloatInf = asfloat(0x7F800000);
 const static uint UintMax = 0xFFFFFFFFu;
 const static int IntMax = 0x7FFFFFFF;
 
-const static float Pi = radians(180.0);
+const static float Pi = 3.14159265359;
 const static float TwoPi = 2.0 * Pi;
 const static float FourPi = 4.0 * Pi;
 const static float HalfPi = Pi / 2.0;
-const static float RcpPi = rcp(Pi);
-const static float RcpTwoPi = rcp(TwoPi);
-const static float RcpFourPi = rcp(FourPi);
-const static float RcpHalfPi = rcp(HalfPi);
+const static float RcpPi = 0.31830988618;
+const static float RcpTwoPi = 0.15915494309;
+const static float RcpFourPi = 1.0 / FourPi;
+const static float RcpHalfPi = 1.0 / HalfPi;
 const static float SqrtPi = sqrt(Pi);
-
-const static half Pih = radians(180.0h);
-const static half TwoPih = 2.0h * Pih;
-const static half FourPih = 4.0h * Pih;
-const static half HalfPih = Pih / 2.0h;
-const static half RcpPih = rcp(Pih);
-const static half RcpTwoPih = rcp(TwoPih);
-const static half RcpFourPih = rcp(FourPih);
-const static half RcpHalfPih = rcp(HalfPih);
-const static half SqrtPih = sqrt(Pih);
 
 float1 Sq(float1 x) { return x * x; }
 float2 Sq(float2 x) { return x * x; }
@@ -80,20 +70,20 @@ float2 Remap01ToHalfTexel(float2 coord, float2 size) { return Remap(coord, 0.0, 
 float3 Remap01ToHalfTexel(float3 coord, float3 size) { return Remap(coord, 0.0, 1.0, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size)); }
 float4 Remap01ToHalfTexel(float4 coord, float4 size) { return Remap(coord, 0.0, 1.0, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size)); }
 
-half1 Remap01ToHalfTexel(half1 coord, half1 size) { return Remap(coord, 0.0h, 1.0h, 0.5h * rcp(size), 1.0h - 0.5h * rcp(size)); }
-half2 Remap01ToHalfTexel(half2 coord, half2 size) { return Remap(coord, 0.0h, 1.0h, 0.5h * rcp(size), 1.0h - 0.5h * rcp(size)); }
-half3 Remap01ToHalfTexel(half3 coord, half3 size) { return Remap(coord, 0.0h, 1.0h, 0.5h * rcp(size), 1.0h - 0.5h * rcp(size)); }
-half4 Remap01ToHalfTexel(half4 coord, half4 size) { return Remap(coord, 0.0h, 1.0h, 0.5h * rcp(size), 1.0h - 0.5h * rcp(size)); }
+half1 Remap01ToHalfTexel(half1 coord, half1 size) { return Remap(coord, 0.0, 1.0, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size)); }
+half2 Remap01ToHalfTexel(half2 coord, half2 size) { return Remap(coord, 0.0, 1.0, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size)); }
+half3 Remap01ToHalfTexel(half3 coord, half3 size) { return Remap(coord, 0.0, 1.0, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size)); }
+half4 Remap01ToHalfTexel(half4 coord, half4 size) { return Remap(coord, 0.0, 1.0, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size)); }
 
 float1 RemapHalfTexelTo01(float1 coord, float1 size) { return Remap(coord, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size), 0.0, 1.0); }
 float2 RemapHalfTexelTo01(float2 coord, float2 size) { return Remap(coord, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size), 0.0, 1.0); }
 float3 RemapHalfTexelTo01(float3 coord, float3 size) { return Remap(coord, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size), 0.0, 1.0); }
 float4 RemapHalfTexelTo01(float4 coord, float4 size) { return Remap(coord, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size), 0.0, 1.0); }
 
-half1 RemapHalfTexelTo01(half1 coord, half1 size) { return Remap(coord, 0.5h * rcp(size), 1.0h - 0.5h * rcp(size), 0.0h, 1.0h); }
-half2 RemapHalfTexelTo01(half2 coord, half2 size) { return Remap(coord, 0.5h * rcp(size), 1.0h - 0.5h * rcp(size), 0.0h, 1.0h); }
-half3 RemapHalfTexelTo01(half3 coord, half3 size) { return Remap(coord, 0.5h * rcp(size), 1.0h - 0.5h * rcp(size), 0.0h, 1.0h); }
-half4 RemapHalfTexelTo01(half4 coord, half4 size) { return Remap(coord, 0.5h * rcp(size), 1.0h - 0.5h * rcp(size), 0.0h, 1.0h); }
+half1 RemapHalfTexelTo01(half1 coord, half1 size) { return Remap(coord, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size), 0.0, 1.0); }
+half2 RemapHalfTexelTo01(half2 coord, half2 size) { return Remap(coord, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size), 0.0, 1.0); }
+half3 RemapHalfTexelTo01(half3 coord, half3 size) { return Remap(coord, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size), 0.0, 1.0); }
+half4 RemapHalfTexelTo01(half4 coord, half4 size) { return Remap(coord, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size), 0.0, 1.0); }
 
 float SqrLength(float1 x) { return dot(x, x); }
 float SqrLength(float2 x) { return dot(x, x); }
@@ -120,10 +110,10 @@ float2 SinFromCos(float2 x) { return sqrt(saturate(1.0 - Sq(x))); }
 float3 SinFromCos(float3 x) { return sqrt(saturate(1.0 - Sq(x))); }
 float4 SinFromCos(float4 x) { return sqrt(saturate(1.0 - Sq(x))); }
 
-half1 SinFromCos(half1 x) { return sqrt(saturate(1.0h - Sq(x))); }
-half2 SinFromCos(half2 x) { return sqrt(saturate(1.0h - Sq(x))); }
-half3 SinFromCos(half3 x) { return sqrt(saturate(1.0h - Sq(x))); }
-half4 SinFromCos(half4 x) { return sqrt(saturate(1.0h - Sq(x))); }
+half1 SinFromCos(half1 x) { return sqrt(saturate(1.0 - Sq(x))); }
+half2 SinFromCos(half2 x) { return sqrt(saturate(1.0 - Sq(x))); }
+half3 SinFromCos(half3 x) { return sqrt(saturate(1.0 - Sq(x))); }
+half4 SinFromCos(half4 x) { return sqrt(saturate(1.0 - Sq(x))); }
 
 float1 FastSqrt(float1 x) { return asfloat(0x1FBD1DF5 + (asint(x) >> 1)); }
 float2 FastSqrt(float2 x) { return asfloat(0x1FBD1DF5 + (asint(x) >> 1)); }
@@ -247,7 +237,7 @@ float RcpSinFromCos(float x)
 
 half RcpSinFromCos(half x)
 {
-	return rsqrt(saturate(1.0h - Sq(x)));
+	return rsqrt(saturate(1.0 - Sq(x)));
 }
 
 float sec(float x)

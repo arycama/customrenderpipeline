@@ -50,10 +50,10 @@ bool3 select(bool3 c, half3 a, half3 b) { return c ? a : b; }
 bool4 select(bool4 c, half4 a, half4 b) { return c ? a : b; }
 #endif
 
-half FastSign(half x) { return select(x >= 0.0h, 1.0h, -1.0h); };
-half2 FastSign(half2 x) { return select(x >= 0.0h, 1.0h, -1.0h); };
-half3 FastSign(half3 x) { return select(x >= 0.0h, 1.0h, -1.0h); };
-half4 FastSign(half4 x) { return select(x >= 0.0h, 1.0h, -1.0h); };
+half FastSign(half x) { return select(x >= 0.0, 1.0, -1.0); };
+half2 FastSign(half2 x) { return select(x >= 0.0, 1.0, -1.0); };
+half3 FastSign(half3 x) { return select(x >= 0.0, 1.0, -1.0); };
+half4 FastSign(half4 x) { return select(x >= 0.0, 1.0, -1.0); };
 
 half Flip(half a, bool flip) { return select(flip, -a, a); }
 half2 Flip(half2 a, bool2 flip) { return select(flip, -a, a); }
@@ -65,10 +65,10 @@ half2 SignFlip(half2 a, half2 s) { return Flip(a, FastSign(s)); }
 half3 SignFlip(half3 a, half3 s) { return Flip(a, FastSign(s)); }
 half4 SignFlip(half4 a, half4 s) { return Flip(a, FastSign(s)); }
 
-void SignSwap(inout half a, inout half b, half s) { Swap(a, b, s < 0.0h); }
-void SignSwap(inout half2 a, inout half2 b, half2 s) { Swap(a, b, s < 0.0h); }
-void SignSwap(inout half3 a, inout half3 b, half3 s) { Swap(a, b, s < 0.0h); }
-void SignSwap(inout half4 a, inout half4 b, half4 s) { Swap(a, b, s < 0.0h); }
+void SignSwap(inout half a, inout half b, half s) { Swap(a, b, s < 0.0); }
+void SignSwap(inout half2 a, inout half2 b, half2 s) { Swap(a, b, s < 0.0); }
+void SignSwap(inout half3 a, inout half3 b, half3 s) { Swap(a, b, s < 0.0); }
+void SignSwap(inout half4 a, inout half4 b, half4 s) { Swap(a, b, s < 0.0); }
 
 // Uint
 void Swap(inout uint a, inout uint b, bool swap = true) { uint t = a; a = select(swap, b, a); b = select(swap, t, b); }
@@ -205,7 +205,7 @@ float2 QuadOffset(float2 screenPos)
 
 half2 QuadOffset(half2 screenPos)
 {
-	return (frac(0.5h * screenPos) >= 0.5h) * 2.0h - 1.0h;
+	return (frac(0.5 * screenPos) >= 0.5) * 2.0 - 1.0;
 }
 
 //float2 QuadOffset(float2 screenPos)
@@ -245,7 +245,7 @@ bool Checker(float2 position)
 
 bool Checker(half2 position)
 {
-	return frac(dot(0.5h, position));
+	return frac(dot(0.5, position));
 }
 
 // draw procedural with 2 triangles has index order (0,1,2)  (0,2,3)
@@ -344,7 +344,7 @@ float3 NormalBlendWhiteout(float3 a, float3 b)
 }
 
 // Combines two normals treating them as heightmap slopes added together
-half3 NormalBlendDerivative(half3 a, half3 b, half scaleA = 1.0h, half scaleB = 1.0h)
+half3 NormalBlendDerivative(half3 a, half3 b, half scaleA = 1.0, half scaleB = 1.0)
 {
 	// https://blog.selfshadow.com/publications/blending-in-detail/
 	return normalize(half3(a.xy * scaleA * b.z + b.xy * scaleB * a.z, a.z * b.z));
@@ -430,7 +430,7 @@ float Select4(float4 a, float b)
 
 half Select4(half4 a, half b)
 {
-	return b > 2.0h ? (b > 3.0h ? a.w : a.z) : (b > 1.0h ? a.y : a.x);
+	return b > 2.0 ? (b > 3.0 ? a.w : a.z) : (b > 1.0 ? a.y : a.x);
 }
 
 float CalculateMipLevel(float2 dx, float2 dy, float2 resolution)

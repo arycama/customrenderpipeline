@@ -81,7 +81,7 @@ half2 PackAlbedo(half3 rgb, float2 screenPosition)
 half3 UnpackAlbedo(half2 a0, half2 a1, half2 a2, float2 screenPosition)
 {
 	half2 lum = half2(a1.x, a2.x);
-	half2 w = step(abs(lum - a0.x), 30.0h / 255.0);
+	half2 w = step(abs(lum - a0.x), 30.0 / 255.0);
 	half W = w.x + w.y;
 	half coCg = W ? (w.x * a1.y + w.y * a2.y) * rcp(W) : a1.y;
 	half3 yCoCg = half3(a0, coCg);

@@ -254,7 +254,7 @@ float GgxVndfRcpPdf(float a, float NdotH, float NdotV, bool useSphericalCap, boo
 	float ndf = GgxD(a2, NdotH) * RcpPi;
 	
 	float ggxNumerator = a2;
-	float ggxDenominator = Sq((NdotH * a2 - NdotH) * NdotH + 1.0h);
+	float ggxDenominator = Sq((NdotH * a2 - NdotH) * NdotH + 1.0);
 	
 	if (!useSphericalCap)
 		return NdotV * 4.0 * ggxDenominator * rcp(ggxNumerator * GgxG1(a * a, NdotV));

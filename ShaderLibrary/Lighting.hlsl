@@ -84,7 +84,7 @@ LightingInput CreateLightingInput(Material material, float3 worldPosition, float
 		output.NdotV = -output.NdotV;
 	}
 	
-	output.perceptualRoughness = max(0.089h, material.roughness);
+	output.perceptualRoughness = max(0.089, material.roughness);
 	output.roughness = PerceptualRoughnessToRoughness(output.perceptualRoughness);
 	output.roughness2 = Sq(output.roughness);
 	output.partLambdaV = GetPartLambdaV(output.roughness2, output.NdotV);
@@ -139,7 +139,7 @@ float GetLightAttenuationAndShadow(Light light, float3 position, float dither, b
 	float distanceSquared = dot(lightVector, lightVector);
 		
 	// Range attenuation (Similar to frostbite, but n=2 instead of 4)
-	float attenuation = saturate(1.0h - distanceSquared * light.rangeSquaredRcp);
+	float attenuation = saturate(1.0 - distanceSquared * light.rangeSquaredRcp);
 		
 	// Angle attenuation
 	float rcpDistance = rsqrt(distanceSquared);
@@ -147,7 +147,7 @@ float GetLightAttenuationAndShadow(Light light, float3 position, float dither, b
 	attenuation *= saturate(dot(light.forward, L) * light.angleScale + light.angleOffset);
 	
 	// Distance squared falloff
-	attenuation *= min(rcpDistance, rcp(0.01h));
+	attenuation *= min(rcpDistance, rcp(0.01));
 	attenuation = Sq(attenuation);
 	
     // Shadows
@@ -343,8 +343,8 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 	
 	// Critical angle for refraction/total internal reflection
 	half eta = ReflectivityToIorRatio(input.reflectivity).r;
-	half sinThetaSq = Sq(eta) * (1.0h - Sq(input.NdotV));
-	opacity = (input.NdotV <= 0.0h && sinThetaSq >= 1.0h) ? 1.0h : opacity;
+	half sinThetaSq = Sq(eta) * (1.0 - Sq(input.NdotV));
+	opacity = (input.NdotV <= 0.0 && sinThetaSq >= 1.0) ? 1.0 : opacity;
 	
 	//luminance += input.specularOpacity * (1.0 - opacity) * specularOcclusion * environmentRefraction;
 	opacity = lerp(0.0, opacity, input.specularOpacity);
