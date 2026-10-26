@@ -279,6 +279,25 @@ float Max4(float4 x)
 	return Max2(max(x.xy, x.zw));
 }
 
+half Max2(half2 x)
+{
+	return max(x.x, x.y);
+}
+
+half Max3(half3 x)
+{
+#ifdef INTRINSIC_MINMAX3
+	return Max3(x.x, x.y, x.z);
+#else
+	return max(x.x, max(x.y, x.z));
+#endif
+}
+
+half Max4(half4 x)
+{
+	return Max2(max(x.xy, x.zw));
+}
+
 float Min2(float2 x)
 {
 	return min(x.x, x.y);
