@@ -64,6 +64,14 @@ float3 PyramidUvToNormal(float2 uv)
 	return normalize(float3(uv, 1.0 - Max2(abs(uv))));
 }
 
+half3 PyramidUvToNormal(half2 uv, bool doNormalize = true, half strength = 1.0)
+{
+	uv = 2.0 * uv - 1.0;
+	uv *= strength;
+	half3 result = half3(uv, 1.0 - Max2(abs(uv)));
+	return doNormalize ? normalize(result) : result;
+}
+
 // Packs a normal into a uv using hemi-octahedral encoding
 float2 NormalToHemiOctahedralUv(float3 n)
 {
