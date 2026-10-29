@@ -73,7 +73,8 @@ LightingInput CreateLightingInput(Material material, float3 worldPosition, float
 	LightingInput output;
 	output.worldPosition = worldPosition;
 	output.V = V;
-	output.N = GetViewClampedNormal(material.normal, V, output.NdotV);
+	output.N = GetViewClampedNormal(material.normal, V);
+	output.NdotV = dot(output.N, output.V);
 	output.bentNormal = material.bentNormal;
 	output.viewDepth = viewDepth;
 	

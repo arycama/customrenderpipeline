@@ -472,8 +472,18 @@ float CosineDifference(float cosA, float cosB)
 float3 Slerp(float3 a, float3 b, float t)
 {
 	float cosTheta = dot(a, b);
-	float theta = FastACos(cosTheta);
-	return (sin((1 - t) * theta) * a + sin(t * theta) * b) / sin(theta);
+
+	#if 0
+		float sinTheta = SinFromCos(cosTheta);
+		float theta = atan2(sinTheta, cosTheta);
+	#else
+		float theta = FastACos(cosTheta);
+		float sinTheta = sin(theta);
+	#endif
+	
+	float wa = sin(-t * theta + theta);
+	float wb = sin(t * theta);
+	return (a * wa + b * wb) / sinTheta;
 }
 
 // Rotates from a to b by cosAngle

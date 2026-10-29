@@ -95,8 +95,7 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 	
 	N = normalize(N);
 	
-	float NdotV;
-	N = GetViewClampedNormal(N, V, NdotV);
+	N = GetViewClampedNormal(N, V);
 	
 	float perceptualRoughness = SmoothnessToPerceptualRoughness(smoothness);
 	perceptualRoughness = SpecularAntiAliasing(perceptualRoughness, N);

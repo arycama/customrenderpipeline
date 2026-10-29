@@ -39,7 +39,7 @@ public class SmoothnessFilterImporter : AssetPostprocessor
 
 	public void OnPostprocessTexture(Texture2D texture)
     {
-        if (assetImporter.userData != "RoughnessFilter")
+        //if (assetImporter.userData != "RoughnessFilter")
             return;
 
         // Need to Apply the texture first so it is available for rendering

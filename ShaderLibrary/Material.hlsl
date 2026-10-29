@@ -128,18 +128,12 @@ half2 ClampScaleTextureUv(half2 uv, half4 scaleLimit)
 }
 
 // Rotates backfacing normals so they do not point away from the camera
-half3 GetViewClampedNormal(half3 N, half3 V, out half NdotV)
+half3 GetViewClampedNormal(half3 N, half3 V)
 {
 	// Due to smoothed normals, interpolation and normal maps, normals can end up pointing away from the view which causes issues with highlights
 	// This rotates the normal towards the view vector so that NdotV is zero, if needed, to avoid issues in the PBR math
-	NdotV = dot(N, V);
-	if (NdotV < 0.0)
-	{
-		N = (N - NdotV * V) * RcpSinFromCos(NdotV);
-		NdotV = 0.0;
-	}
-	
-	return N;
+	half NdotV = dot(N, V);
+	return (saturate(-NdotV) * V + N) * RcpSinFromCos(saturate(-NdotV));
 }
 
 half SpecularAntiAliasing(half perceptualRoughness, half3 worldNormal)

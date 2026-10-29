@@ -91,8 +91,8 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	//gbufferAlbedo *= lerp(1, factor, wetLevel);
 	//roughness = lerp(0.0, roughness, lerp(1, factor, wetLevel));
 	
-	float NdotV;
-	float3 N = GetViewClampedNormal(worldNormal, V, NdotV);
+	float3 N = GetViewClampedNormal(worldNormal, V);
+	float NdotV = dot(N, V);
 	
 	// Energy compensation (TODO: Just use fresnel?)
 	gbufferAlbedo *= EnergyCompensationFactor(0.02, normalOcclusionRoughness.a, NdotV);
