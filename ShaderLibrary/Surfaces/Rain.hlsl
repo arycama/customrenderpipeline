@@ -62,7 +62,7 @@ FragmentInput Vertex(uint vertexId : SV_VertexID)
 	output.position = WorldToClipPosition(worldPosition);
 	
 	float3 V = normalize(-worldPosition);
-	float3 lighting = AmbientHgTwoLobe(V, ForwardScatterPhase, -BackwardScatterPhase, ScatterBlend);
+	float3 lighting = AmbientHgTwoLobe(V, ForwardScatterPhase, -BackwardScatterPhase, ScatterBlend, AmbientSh);
 	
 	float shadow = GetDirectionalShadow(worldPosition) * CloudTransmittance(worldPosition);
 	float LdotV = dot(_LightDirection0, V);

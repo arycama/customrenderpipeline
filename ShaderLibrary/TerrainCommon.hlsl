@@ -171,7 +171,10 @@ void ShadeTerrain(float2 uv, float2 dxUv, float2 dyUv, out float3 albedo, out fl
 		
 		float3 currentAlbedo = AlbedoSmoothness.SampleGrad(TrilinearRepeatAniso8Sampler, float3(sampleUv, layerIndex), localDx, localDy);
 		float4 currentNormalOcclusionRoughness = Normal.SampleGrad(TrilinearRepeatAniso8Sampler, float3(sampleUv, layerIndex), localDx, localDy);
-		currentNormalOcclusionRoughness.rg = UnpackNormalDerivativesUNorm(currentNormalOcclusionRoughness.rg);
+		float3 n = PyramidUvToNormal(currentNormalOcclusionRoughness.rg);
+		currentNormalOcclusionRoughness.rg = n.xy / n.z;
+		
+		//currentNormalOcclusionRoughness.rg = UnpackNormalDerivativesUNorm(currentNormalOcclusionRoughness.rg);
 		currentNormalOcclusionRoughness.rg = mul(currentNormalOcclusionRoughness.rg, rotationMatrix);
 		
 		float layerHeightScale = BitUnpackFloat(layerData, 5, 17) * 0.32;

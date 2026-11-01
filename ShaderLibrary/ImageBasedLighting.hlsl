@@ -29,59 +29,59 @@ cbuffer AmbientShBuffer
 	float4 AmbientSh[7];
 };
 
-float3 AmbientCosine(float3 N, float cosVisibilityAngle = HalfPi)
+float3 AmbientCosine(float3 N, float4 sh[7], float cosVisibilityAngle = HalfPi)
 {
-	return EvaluateSh(N, AmbientSh, CosineZonalHarmonics(cosVisibilityAngle));
+	return EvaluateSh(N, sh, CosineZonalHarmonics(cosVisibilityAngle));
 }
 
-float3 AmbientIsotropic(float3 V)
+float3 AmbientIsotropic(float3 V, float4 sh[7])
 {
-	return EvaluateSh(-V, AmbientSh, IsotropicZonalHarmonics);
+	return EvaluateSh(-V, sh, IsotropicZonalHarmonics);
 }
 
-float3 AmbientRayleigh(float3 V)
+float3 AmbientRayleigh(float3 V, float4 sh[7])
 {
-	return EvaluateSh(-V, AmbientSh, RayleighZonalHarmonics);
+	return EvaluateSh(-V, sh, RayleighZonalHarmonics);
 }
 
-float3 AmbientHazy(float3 V)
+float3 AmbientHazy(float3 V, float4 sh[7])
 {
-	return EvaluateSh(-V, AmbientSh, HazyZonalHarmonics);
+	return EvaluateSh(-V, sh, HazyZonalHarmonics);
 }
 
-float3 AmbientMurky(float3 V)
+float3 AmbientMurky(float3 V, float4 sh[7])
 {
-	return EvaluateSh(-V, AmbientSh, MurkyZonalHarmonics);
+	return EvaluateSh(-V, sh, MurkyZonalHarmonics);
 }
 
-float3 AmbientSchlick(float3 V, float g)
+float3 AmbientSchlick(float3 V, float g, float4 sh[7])
 {
-	return EvaluateSh(-V, AmbientSh, SchlickZonalHarmonics(g));
+	return EvaluateSh(-V, sh, SchlickZonalHarmonics(g));
 }
 
-float3 AmbientSchlickTwoLobe(float3 V, float g0, float g1, float blend)
+float3 AmbientSchlickTwoLobe(float3 V, float g0, float g1, float blend, float4 sh[7])
 {
-	return EvaluateSh(-V, AmbientSh, lerp(SchlickZonalHarmonics(g0), SchlickZonalHarmonics(g1), blend));
+	return EvaluateSh(-V, sh, lerp(SchlickZonalHarmonics(g0), SchlickZonalHarmonics(g1), blend));
 }
 
-float3 AmbientHg(float3 V, float g)
+float3 AmbientHg(float3 V, float g, float4 sh[7])
 {
-	return EvaluateSh(-V, AmbientSh, HenyeyGreensteinZonalHarmonics(g));
+	return EvaluateSh(-V, sh, HenyeyGreensteinZonalHarmonics(g));
 }
 
-float3 AmbientHgTwoLobe(float3 V, float g0, float g1, float blend)
+float3 AmbientHgTwoLobe(float3 V, float g0, float g1, float blend, float4 sh[7])
 {
-	return EvaluateSh(-V, AmbientSh, lerp(HenyeyGreensteinZonalHarmonics(g0), HenyeyGreensteinZonalHarmonics(g1), blend));
+	return EvaluateSh(-V, sh, lerp(HenyeyGreensteinZonalHarmonics(g0), HenyeyGreensteinZonalHarmonics(g1), blend));
 }
 
-float3 AmbientCs(float3 V, float g)
+float3 AmbientCs(float3 V, float g, float4 sh[7])
 {
-	return EvaluateSh(-V, AmbientSh, CornetteShanksZonalHarmonics(g));
+	return EvaluateSh(-V, sh, CornetteShanksZonalHarmonics(g));
 }
 
-float3 AmbientCsTwoLobe(float3 V, float g0, float g1, float blend)
+float3 AmbientCsTwoLobe(float3 V, float g0, float g1, float blend, float4 sh[7])
 {
-	return EvaluateSh(-V, AmbientSh, lerp(CornetteShanksZonalHarmonics(g0), CornetteShanksZonalHarmonics(g1), blend));
+	return EvaluateSh(-V, sh, lerp(CornetteShanksZonalHarmonics(g0), CornetteShanksZonalHarmonics(g1), blend));
 }
 
 float3 GetSpecularDominantDir(float3 N, float3 R, float roughness, float NdotV)

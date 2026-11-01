@@ -136,7 +136,7 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 	
 	float3 atmosphereTransmittance = TransmittanceToAtmosphere(ViewHeight, -V.y, _LightDirection0.y, dot(_LightDirection0, V), waterDistance);
 	float3 sunColor = _LightColor0 * Exposure * atmosphereTransmittance;
-	float3 ambient = AmbientCosine(float3(0.0, 1.0, 0.0));
+	float3 ambient = AmbientCosine(float3(0.0, 1.0, 0.0), AmbientSh);
 
 	// Select random channel
 	float2 noise = Noise2D(input.position.xy);

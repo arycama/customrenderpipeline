@@ -142,7 +142,7 @@ void RayGeneration()
 	
 	// Ambient 
 	float3 finalTransmittance = exp(-t * Extinction);
-	luminance += AmbientCosine(float3(0.0, 1.0, 0.0)) * (1.0 - finalTransmittance);
+	luminance += AmbientCosine(float3(0.0, 1.0, 0.0), AmbientSh) * (1.0 - finalTransmittance);
 	luminance *= Albedo;
 	
 	ScatterResult[position] = luminance;

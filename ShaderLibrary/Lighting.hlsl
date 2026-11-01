@@ -319,7 +319,7 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 	float3 environmentWeight = dfg.x * input.reflectivity + dfg.y;
 	luminance += radiance * environmentWeight;
 
-	float3 irradiance = AmbientCosine(input.bentNormal, input.cosVisibilityAngle);
+	float3 irradiance = AmbientCosine(input.bentNormal, AmbientSh, input.cosVisibilityAngle);
 	
 	#ifdef UNDERWATER_LIGHTING_ON
 		irradiance *= underwaterTransmittance;
@@ -337,7 +337,7 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 	float3 kd = 1.0 - environmentWeight - fmsEms;
 	luminance += irradiance * (fmsEms + input.albedo * (1.0 - input.translucency) * kd);
 	
-	luminance += AmbientCosine(-input.bentNormal, input.cosVisibilityAngle) * (input.albedo * input.translucency * kd);
+	luminance += AmbientCosine(-input.bentNormal, AmbientSh, input.cosVisibilityAngle) * (input.albedo * input.translucency * kd);
 	
 	// Environment specular transmission
 	half opacity = lerp(input.diffuseOpacity, 1.0, environmentWeight.r);
